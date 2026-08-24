@@ -25,13 +25,13 @@ class Settings:
     DB_USER: str = os.getenv("DB_USER", "bathagent_user")
     DB_PASSWORD: str = os.getenv("DB_PASSWORD", "BathAgent2026ReadPass!")
     DB_NAME: str = os.getenv("DB_NAME", "postgres")
-    DB_SSLMODE: str = os.getenv("DB_SSLMODE", "prefer")
+    DB_SSLMODE: str = os.getenv("DB_SSLMODE", "require")
 
     # MCP Toolbox for Databases
     TOOLBOX_URL: str = os.getenv("TOOLBOX_URL", "http://localhost:5000")
 
     # Wildfire Proxy Settings
-    WILDFIRE_URL: str = os.getenv("WILDFIRE_URL", "http://localhost:8080")
+    WILDFIRE_URL: str = os.getenv("WILDFIRE_URL", "https://wildfire-proxy-621250335539.us-central1.run.app")
     WILDFIRE_API_TOKEN: str = os.getenv("WILDFIRE_API_TOKEN", "bathagent_wf_token_2026")
 
     # Application Settings
