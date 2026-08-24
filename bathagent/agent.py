@@ -61,11 +61,19 @@ class BathAgent:
         self.wildfire = WildfireClient()
         self.history: List[Dict[str, Any]] = []
         
-        # Initialize Gemini Client if API key is provided
+        # Initialize Gemini Client (supports API Key or Vertex AI Application Default Credentials)
         self.client = None
-        if GENAI_AVAILABLE and (settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")):
+        if GENAI_AVAILABLE:
             api_key = settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")
-            self.client = genai.Client(api_key=api_key)
+            if api_key:
+                self.client = genai.Client(api_key=api_key)
+            else:
+                project = os.getenv("GOOGLE_CLOUD_PROJECT", os.getenv("GCP_PROJECT", "andybrook-playground"))
+                location = os.getenv("GOOGLE_CLOUD_REGION", os.getenv("GCP_REGION", "us-central1"))
+                try:
+                    self.client = genai.Client(vertexai=True, project=project, location=location)
+                except Exception as e:
+                    print(f"Vertex AI initialization notice: {e}")
 
     # -------------------------------------------------------------------------
     # Tool Bindings
