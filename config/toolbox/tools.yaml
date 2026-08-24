@@ -1,0 +1,115 @@
+# MCP Toolbox for Databases Configuration for BathStuff
+# Defines connection sources and prebuilt tools exposed via Model Context Protocol (MCP)
+
+version: "0.1"
+
+sources:
+  bathstuff-db:
+    kind: postgres
+    host: ${DB_HOST:-localhost}
+    port: ${DB_PORT:-5432}
+    user: ${DB_USER:-postgres}
+    password: ${DB_PASSWORD:-postgres}
+    database: ${DB_NAME:-bathstuff}
+
+tools:
+  # 1. Lookup customer orders
+  lookup_customer_orders:
+    source: bathstuff-db
+    description: "Look up all orders for a specific customer by their customer ID, including status and shipping dates."
+    statement: |
+      SELECT 
+        o.order_id,
+        o.customer_id,
+        c.full_name as customer_name,
+        c.email,
+        o.order_date,
+        o.ship_date,
+        o.status,
+        COUNT(oi.order_item_id) as total_items,
+        COALESCE(SUM(oi.line_total), 0) as total_amount
+      FROM orders o
+      JOIN customers c ON o.customer_id = c.customer_id
+      LEFT JOIN order_items oi ON o.order_id = oi.order_id
+      WHERE o.customer_id = :customer_id
+      GROUP BY o.order_id, o.customer_id, c.full_name, c.email, o.order_date, o.ship_date, o.status
+      ORDER BY o.order_date DESC;
+    parameters:
+      - name: customer_id
+        type: integer
+        description: "The unique integer ID of the customer (e.g., 101)."
+        required: true
+
+  # 2. Get order details with line items
+  get_order_details:
+    source: bathstuff-db
+    description: "Retrieve comprehensive details for a specific order, including customer info and each line item."
+    statement: |
+      SELECT 
+        oi.order_item_id,
+        oi.order_id,
+        p.product_id,
+        p.sku,
+        p.name as product_name,
+        s.name as supplier_name,
+        s.country_of_origin,
+        oi.quantity,
+        oi.unit_price,
+        oi.line_total,
+        oi.note
+      FROM order_items oi
+      JOIN products p ON oi.product_id = p.product_id
+      JOIN suppliers s ON p.supplier_id = s.supplier_id
+      WHERE oi.order_id = :order_id
+      ORDER BY oi.order_item_id ASC;
+    parameters:
+      - name: order_id
+        type: integer
+        description: "The unique integer ID of the order (e.g., 1001)."
+        required: true
+
+  # 3. Create a new customer order
+  create_customer_order:
+    source: bathstuff-db
+    description: "Create a new order for a customer in PENDING status."
+    statement: |
+      INSERT INTO orders (order_id, customer_id, order_date, status)
+      VALUES (:order_id, :customer_id, CURRENT_DATE, 'PENDING')
+      RETURNING order_id, customer_id, order_date, status;
+    parameters:
+      - name: order_id
+        type: integer
+        description: "New order ID (must be unique integer)."
+        required: true
+      - name: customer_id
+        type: integer
+        description: "Customer ID placing the order."
+        required: true
+
+  # 4. Cancel an unshipped order
+  cancel_unshipped_order:
+    source: bathstuff-db
+    description: "Cancel an order if it has not yet shipped. Rejects cancellation if status is SHIPPED or DELIVERED."
+    statement: |
+      UPDATE orders
+      SET status = 'CANCELLED'
+      WHERE order_id = :order_id AND status NOT IN ('SHIPPED', 'DELIVERED')
+      RETURNING order_id, customer_id, status;
+    parameters:
+      - name: order_id
+        type: integer
+        description: "The order ID to cancel."
+        required: true
+
+  # 5. Read-only arbitrary SQL tool
+  execute_sql_read_only:
+    source: bathstuff-db
+    description: "Execute a read-only SELECT SQL query against the BathStuff database. Any mutating statements (INSERT, UPDATE, DELETE, DROP, etc.) will be rejected."
+    statement: |
+      /* Tool execution wrapper for SELECT statements */
+      :query
+    parameters:
+      - name: query
+        type: string
+        description: "A valid read-only SQL SELECT statement (e.g. 'SELECT * FROM products WHERE ...')."
+        required: true

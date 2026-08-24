@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # 1. BathStuff Production Database (PostgreSQL / AlloyDB compatible)
+  bathstuff-db:
+    image: postgres:16-alpine
+    container_name: bathstuff-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bathstuff
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./bathagent/database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bathstuff"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. BathAgent Web UI
+  bathagent-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bathagent-ui
+    ports:
+      - "8501:8501"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - DB_HOST=bathstuff-db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=bathstuff
+      - WILDFIRE_URL=${WILDFIRE_URL:-http://host.docker.internal:8787}
+      - WILDFIRE_API_TOKEN=${WILDFIRE_API_TOKEN:-}
+    depends_on:
+      bathstuff-db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
