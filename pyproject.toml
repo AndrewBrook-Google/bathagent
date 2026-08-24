@@ -25,4 +25,3 @@ dependencies = [
 
 [project.scripts]
 bathagent-cli = "bathagent.cli:main"
-bathagent-init-db = "bathagent.database.init_db:init_database"

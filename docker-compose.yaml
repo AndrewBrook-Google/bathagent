@@ -13,7 +13,7 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./bathagent/database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./scripts/db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d bathstuff"]
       interval: 5s

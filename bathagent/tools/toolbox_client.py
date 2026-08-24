@@ -1,10 +1,11 @@
-"""MCP Toolbox for Databases client and direct tool execution bindings.
-Implements prebuilt tools for customer orders and strict read-only SQL execution.
+"""MCP Toolbox for Databases client.
+Executes prebuilt parameterized customer tools and strict read-only queries against AlloyDB.
 """
 
 import re
-import sqlite3
 from typing import Any, Dict, List, Optional
+import urllib.request
+import json
 
 try:
     import psycopg2
@@ -20,21 +21,23 @@ class ToolboxClient:
     """Provides access to database tools exposed via MCP Toolbox for Databases."""
 
     def __init__(self):
-        self.use_sqlite = settings.USE_SQLITE or not PSYCOPG2_AVAILABLE
-        self.sqlite_path = settings.SQLITE_PATH
+        self.toolbox_url = settings.TOOLBOX_URL.rstrip("/")
 
     def _get_connection(self):
-        if self.use_sqlite:
-            conn = sqlite3.connect(self.sqlite_path)
-            conn.row_factory = sqlite3.Row
-            return conn
-        return psycopg2.connect(
-            host=settings.DB_HOST,
-            port=settings.DB_PORT,
-            user=settings.DB_USER,
-            password=settings.DB_PASSWORD,
-            dbname=settings.DB_NAME,
-        )
+        """Creates a direct connection to AlloyDB using psycopg2."""
+        if not PSYCOPG2_AVAILABLE:
+            raise RuntimeError("psycopg2 is required to connect to AlloyDB. Install psycopg2-binary.")
+        
+        conn_kwargs = {
+            "host": settings.DB_HOST,
+            "port": settings.DB_PORT,
+            "user": settings.DB_USER,
+            "dbname": settings.DB_NAME,
+            "sslmode": settings.DB_SSLMODE,
+        }
+        if settings.DB_PASSWORD:
+            conn_kwargs["password"] = settings.DB_PASSWORD
+        return psycopg2.connect(**conn_kwargs)
 
     def lookup_customer_orders(self, customer_id: int) -> Dict[str, Any]:
         """Look up all orders for a specific customer by their customer ID."""
@@ -58,15 +61,9 @@ class ToolboxClient:
         """
         try:
             conn = self._get_connection()
-            if self.use_sqlite:
-                query_sql = query.replace("%s", "?")
-                cur = conn.cursor()
-                cur.execute(query_sql, (customer_id,))
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(query, (customer_id,))
                 rows = [dict(r) for r in cur.fetchall()]
-            else:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute(query, (customer_id,))
-                    rows = [dict(r) for r in cur.fetchall()]
             conn.close()
             return {"status": "success", "customer_id": customer_id, "orders_count": len(rows), "orders": rows}
         except Exception as e:
@@ -95,15 +92,9 @@ class ToolboxClient:
         """
         try:
             conn = self._get_connection()
-            if self.use_sqlite:
-                query_sql = query.replace("%s", "?")
-                cur = conn.cursor()
-                cur.execute(query_sql, (order_id,))
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(query, (order_id,))
                 items = [dict(r) for r in cur.fetchall()]
-            else:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute(query, (order_id,))
-                    items = [dict(r) for r in cur.fetchall()]
             conn.close()
             return {"status": "success", "order_id": order_id, "items_count": len(items), "items": items}
         except Exception as e:
@@ -115,59 +106,31 @@ class ToolboxClient:
             conn = self._get_connection()
             cur = conn.cursor()
             
-            # Find next order_id and item_id
-            if self.use_sqlite:
-                cur.execute("SELECT COALESCE(MAX(order_id), 1000) + 1 FROM orders")
-                new_order_id = cur.fetchone()[0]
-                cur.execute("SELECT COALESCE(MAX(order_item_id), 5000) + 1 FROM order_items")
-                next_item_id = cur.fetchone()[0]
-                
-                cur.execute(
-                    "INSERT INTO orders (order_id, customer_id, order_date, status) VALUES (?, ?, CURRENT_DATE, 'PENDING')",
-                    (new_order_id, customer_id),
-                )
-                
-                created_items = []
-                for item in items:
-                    p_id = item.get("product_id")
-                    qty = item.get("quantity", 1)
-                    unit_price = item.get("unit_price", 10.00)
-                    line_total = round(qty * unit_price, 2)
-                    note = item.get("note", "New customer order")
-                    
-                    cur.execute(
-                        "INSERT INTO order_items VALUES (?, ?, ?, ?, ?, ?, ?)",
-                        (next_item_id, new_order_id, p_id, qty, unit_price, line_total, note),
-                    )
-                    created_items.append({"order_item_id": next_item_id, "product_id": p_id, "quantity": qty, "line_total": line_total})
-                    next_item_id += 1
-                conn.commit()
-            else:
-                cur.execute("SELECT COALESCE(MAX(order_id), 1000) + 1 FROM orders")
-                new_order_id = cur.fetchone()[0]
-                cur.execute("SELECT COALESCE(MAX(order_item_id), 5000) + 1 FROM order_items")
-                next_item_id = cur.fetchone()[0]
+            cur.execute("SELECT COALESCE(MAX(order_id), 1000) + 1 FROM orders")
+            new_order_id = cur.fetchone()[0]
+            cur.execute("SELECT COALESCE(MAX(order_item_id), 5000) + 1 FROM order_items")
+            next_item_id = cur.fetchone()[0]
+
+            cur.execute(
+                "INSERT INTO orders (order_id, customer_id, order_date, status) VALUES (%s, %s, CURRENT_DATE, 'PENDING')",
+                (new_order_id, customer_id),
+            )
+            created_items = []
+            for item in items:
+                p_id = item.get("product_id")
+                qty = item.get("quantity", 1)
+                unit_price = item.get("unit_price", 10.00)
+                line_total = round(qty * unit_price, 2)
+                note = item.get("note", "New customer order")
 
                 cur.execute(
-                    "INSERT INTO orders (order_id, customer_id, order_date, status) VALUES (%s, %s, CURRENT_DATE, 'PENDING')",
-                    (new_order_id, customer_id),
+                    "INSERT INTO order_items VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                    (next_item_id, new_order_id, p_id, qty, unit_price, line_total, note),
                 )
-                created_items = []
-                for item in items:
-                    p_id = item.get("product_id")
-                    qty = item.get("quantity", 1)
-                    unit_price = item.get("unit_price", 10.00)
-                    line_total = round(qty * unit_price, 2)
-                    note = item.get("note", "New customer order")
-
-                    cur.execute(
-                        "INSERT INTO order_items VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                        (next_item_id, new_order_id, p_id, qty, unit_price, line_total, note),
-                    )
-                    created_items.append({"order_item_id": next_item_id, "product_id": p_id, "quantity": qty, "line_total": line_total})
-                    next_item_id += 1
-                conn.commit()
-
+                created_items.append({"order_item_id": next_item_id, "product_id": p_id, "quantity": qty, "line_total": line_total})
+                next_item_id += 1
+            
+            conn.commit()
             cur.close()
             conn.close()
             return {
@@ -186,42 +149,22 @@ class ToolboxClient:
             conn = self._get_connection()
             cur = conn.cursor()
             
-            # Check current order status
-            if self.use_sqlite:
-                cur.execute("SELECT status FROM orders WHERE order_id = ?", (order_id,))
-                row = cur.fetchone()
-                if not row:
-                    conn.close()
-                    return {"status": "error", "error": f"Order #{order_id} not found."}
-                current_status = row[0]
-                
-                if current_status in ("SHIPPED", "DELIVERED"):
-                    conn.close()
-                    return {
-                        "status": "rejected",
-                        "error": f"Cannot cancel Order #{order_id} because its current status is '{current_status}'. Orders can only be cancelled prior to shipping.",
-                    }
-                
-                cur.execute("UPDATE orders SET status = 'CANCELLED' WHERE order_id = ?", (order_id,))
-                conn.commit()
-            else:
-                cur.execute("SELECT status FROM orders WHERE order_id = %s", (order_id,))
-                row = cur.fetchone()
-                if not row:
-                    conn.close()
-                    return {"status": "error", "error": f"Order #{order_id} not found."}
-                current_status = row[0]
+            cur.execute("SELECT status FROM orders WHERE order_id = %s", (order_id,))
+            row = cur.fetchone()
+            if not row:
+                conn.close()
+                return {"status": "error", "error": f"Order #{order_id} not found."}
+            current_status = row[0]
 
-                if current_status in ("SHIPPED", "DELIVERED"):
-                    conn.close()
-                    return {
-                        "status": "rejected",
-                        "error": f"Cannot cancel Order #{order_id} because its current status is '{current_status}'. Orders can only be cancelled prior to shipping.",
-                    }
+            if current_status in ("SHIPPED", "DELIVERED"):
+                conn.close()
+                return {
+                    "status": "rejected",
+                    "error": f"Cannot cancel Order #{order_id} because its current status is '{current_status}'. Orders can only be cancelled prior to shipping.",
+                }
 
-                cur.execute("UPDATE orders SET status = 'CANCELLED' WHERE order_id = %s", (order_id,))
-                conn.commit()
-
+            cur.execute("UPDATE orders SET status = 'CANCELLED' WHERE order_id = %s", (order_id,))
+            conn.commit()
             cur.close()
             conn.close()
             return {
@@ -268,21 +211,15 @@ class ToolboxClient:
 
         try:
             conn = self._get_connection()
-            if self.use_sqlite:
-                cur = conn.cursor()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(clean_query)
-                cols = [desc[0] for desc in cur.description] if cur.description else []
-                rows = [dict(zip(cols, row)) for row in cur.fetchall()]
-            else:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute(clean_query)
-                    rows = [dict(r) for r in cur.fetchall()]
+                rows = [dict(r) for r in cur.fetchall()]
             conn.close()
             return {
                 "status": "success",
                 "query": clean_query,
                 "rows_returned": len(rows),
-                "data": rows[:100],  # cap at 100 rows for display
+                "data": rows[:100],
             }
         except Exception as e:
             return {"status": "error", "query": clean_query, "error": str(e)}

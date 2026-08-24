@@ -1,5 +1,7 @@
--- BathStuff Baseline Production Schema
--- Designed for AlloyDB / PostgreSQL
+-- ============================================================================
+-- BathStuff Clean Baseline Production Schema
+-- Designed for AlloyDB for PostgreSQL
+-- ============================================================================
 
 DROP TABLE IF EXISTS order_items CASCADE;
 DROP TABLE IF EXISTS orders CASCADE;
@@ -73,7 +75,7 @@ CREATE TABLE order_items (
     note TEXT
 );
 
--- Indexing for performance and query optimization
+-- Performance & Indexing
 CREATE INDEX idx_orders_customer ON orders(customer_id);
 CREATE INDEX idx_orders_ship_date ON orders(ship_date);
 CREATE INDEX idx_order_items_order ON order_items(order_id);
