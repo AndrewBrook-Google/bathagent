@@ -66,13 +66,24 @@ PRODUCTS = [
 
 
 class OrderItem:
-    def __init__(self, product_id: int, sku: str, name: str, quantity: int, unit_price: float):
+    def __init__(
+        self,
+        product_id: Optional[int],
+        sku: Optional[str],
+        name: str,
+        quantity: int,
+        unit_price: float,
+        item_type: str = "PRODUCT",
+        item_description: Optional[str] = None,
+    ):
         self.product_id = product_id
         self.sku = sku
         self.name = name
         self.quantity = quantity
-        self.unit_price = unit_price
+        self.unit_price = round(unit_price, 2)
         self.line_total = round(quantity * unit_price, 2)
+        self.item_type = item_type
+        self.item_description = item_description
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -82,7 +93,49 @@ class OrderItem:
             "quantity": self.quantity,
             "unit_price": self.unit_price,
             "line_total": self.line_total,
+            "item_type": self.item_type,
+            "item_description": self.item_description,
         }
+
+COUNTRY_DISTANCE_BASE = {
+    "USA": 4.00,
+    "Canada": 8.00,
+    "UK": 15.00,
+    "France": 15.00,
+    "Germany": 15.00,
+    "Italy": 15.00,
+    "Spain": 15.00,
+    "Netherlands": 15.00,
+    "Norway": 16.00,
+    "SE": 16.00,
+    "Switzerland": 15.00,
+    "Elbonia": 18.00,
+    "Japan": 22.00,
+    "Australia": 28.00,
+}
+
+COUNTRY_PER_ITEM = {
+    "USA": 1.50,
+    "Canada": 2.00,
+    "UK": 3.00,
+    "France": 3.00,
+    "Germany": 3.00,
+    "Italy": 3.00,
+    "Spain": 3.00,
+    "Netherlands": 3.00,
+    "Norway": 3.00,
+    "SE": 3.00,
+    "Switzerland": 3.00,
+    "Elbonia": 3.50,
+    "Japan": 4.00,
+    "Australia": 5.00,
+}
+
+
+def compute_shipping_amount(country: str, total_item_qty: int) -> float:
+    base = COUNTRY_DISTANCE_BASE.get(country, 18.00)
+    per_item = COUNTRY_PER_ITEM.get(country, 3.00)
+    return round(base + (per_item * max(1, total_item_qty)), 2)
 
 
 class SimulatedOrder:
@@ -109,7 +162,7 @@ class SimulatedOrder:
         self.ship_date = ship_date
         self.delivery_date = delivery_date
 
-        self.total_price = round(sum(it.line_total for it in items), 2)
+        self.total_price = round(sum(it.line_total for it in items if it.item_type != 'CREDIT') - sum(it.line_total for it in items if it.item_type == 'CREDIT'), 2)
         self.amount_paid = round(self.total_price * paid_fraction, 2)
         self.total_outstanding = round(self.total_price - self.amount_paid, 2)
 
@@ -127,7 +180,7 @@ class SimulatedOrder:
             "amount_paid": self.amount_paid,
             "total_outstanding": self.total_outstanding,
             "items": [it.to_dict() for it in self.items],
-            "item_count": sum(it.quantity for it in self.items),
+            "item_count": sum(it.quantity for it in self.items if it.item_type == 'PRODUCT'),
         }
 
 
@@ -306,16 +359,69 @@ class SimulatorEngine:
             self.known_customers[cust["customer_id"]] = cust
 
         item_defs = random.sample(PRODUCTS, k=random.randint(1, 4))
-        items = [
+        prod_items = [
             OrderItem(
-                p["product_id"],
-                p["sku"],
-                p["name"],
-                random.randint(1, 4),
-                p["unit_price"],
+                product_id=p["product_id"],
+                sku=p["sku"],
+                name=p["name"],
+                quantity=random.randint(1, 4),
+                unit_price=p["unit_price"],
+                item_type="PRODUCT",
+                item_description=None,
             )
             for p in item_defs
         ]
+
+        total_prod_qty = sum(it.quantity for it in prod_items)
+        prod_subtotal = sum(it.line_total for it in prod_items)
+
+        # 1. Tax calculation matching default tax codes (oral_care=5%, body_wash=6%, accessories=7%)
+        tax_rate_map = {1: 0.05, 2: 0.06, 3: 0.07}
+        tax_total = sum(
+            it.line_total * tax_rate_map.get(p.get("tax_code_id", 1), 0.05)
+            for it, p in zip(prod_items, item_defs)
+        )
+        tax_amount = round(tax_total, 2)
+        if tax_amount <= 0:
+            tax_amount = round(prod_subtotal * 0.05, 2)
+        effective_rate = round((tax_amount / max(0.01, prod_subtotal)) * 100, 1)
+
+        tax_item = OrderItem(
+            product_id=None,
+            sku=None,
+            name="Sales Tax",
+            quantity=1,
+            unit_price=tax_amount,
+            item_type="TAX",
+            item_description=f"Standard Sales Tax ({effective_rate}%)",
+        )
+
+        # 2. Shipping calculation proportional to item count and distance from US
+        ship_amount = compute_shipping_amount(cust.get("country", "USA"), total_prod_qty)
+        ship_item = OrderItem(
+            product_id=None,
+            sku=None,
+            name="Standard Shipping",
+            quantity=1,
+            unit_price=ship_amount,
+            item_type="SHIPPING",
+            item_description=None,
+        )
+
+        all_items = list(prod_items) + [tax_item, ship_item]
+
+        # 3. Rush handling fee on ~7% of orders
+        if random.random() < 0.07:
+            fee_item = OrderItem(
+                product_id=None,
+                sku=None,
+                name="Rush Handling",
+                quantity=1,
+                unit_price=15.00,
+                item_type="FEE",
+                item_description="Rush Handling Fee",
+            )
+            all_items.append(fee_item)
 
         paid_fraction = 1.0
         if random.random() < self.partial_payment_prob:
@@ -330,7 +436,7 @@ class SimulatorEngine:
             customer_name=cust["name"],
             customer_country=cust["country"],
             order_date=self.sim_time,
-            items=items,
+            items=all_items,
             status="PROCESSING",
             paid_fraction=paid_fraction,
         )
@@ -338,7 +444,7 @@ class SimulatorEngine:
         self.total_generated += 1
 
         # WRITE DIRECTLY TO ALLOYDB BATHSTUFF-PROD
-        item_dicts = [it.to_dict() for it in items]
+        item_dicts = [it.to_dict() for it in all_items]
         ok = alloydb_client.insert_order_into_alloydb(
             order_id=oid,
             customer_id=cust["customer_id"],
@@ -353,14 +459,14 @@ class SimulatorEngine:
             customer_country=cust.get("country", "USA"),
         )
 
-        items_summary = ", ".join(f"{it.quantity}x {it.name}" for it in items)
+        prod_summary = ", ".join(f"{it.quantity}x {it.name}" for it in prod_items)
         pay_info = f"Paid: ${order.amount_paid:.2f}" if order.total_outstanding == 0 else f"Paid: ${order.amount_paid:.2f} (Outstanding: ${order.total_outstanding:.2f})"
         db_tag = "AlloyDB bathstuff-prod" if ok else "Local"
         self._log_event(
             "ORDER_PLACED",
-            f"Order #{oid} written to {db_tag} · Customer #{cust['customer_id']} {cust['name']} ({cust['country']}) · Total: ${order.total_price:.2f} · {items_summary} · {pay_info}",
+            f"Order #{oid} written to {db_tag} · Customer #{cust['customer_id']} {cust['name']} ({cust['country']}) · Total: ${order.total_price:.2f} (Prod: ${prod_subtotal:.2f}, Tax: ${tax_amount:.2f}, Ship: ${ship_amount:.2f}) · {prod_summary} · {pay_info}",
             order_id=oid,
-            meta={"customer": cust["name"], "customer_id": cust["customer_id"], "total": order.total_price, "items_count": len(items), "alloydb": ok},
+            meta={"customer": cust["name"], "customer_id": cust["customer_id"], "total": order.total_price, "items_count": len(prod_items), "alloydb": ok},
         )
         return order
 

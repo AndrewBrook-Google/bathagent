@@ -171,13 +171,22 @@ def insert_order_into_alloydb(
 
         # 2. Insert order items
         for it in items:
-            p_id = it["product_id"]
-            qty = it["quantity"]
-            uprice = it["unit_price"]
-            ltotal = it["line_total"]
+            p_id = it.get("product_id")
+            p_id_val = str(p_id) if p_id is not None else "NULL"
+            qty = it.get("quantity", 1)
+            uprice = float(it.get("unit_price", 0.0))
+            ltotal = float(it.get("line_total", 0.0))
+            itype = it.get("item_type", "PRODUCT")
+            idesc_raw = it.get("item_description")
+            if idesc_raw:
+                escaped_desc = idesc_raw.replace("'", "''")
+                idesc_val = f"'{escaped_desc}'"
+            else:
+                idesc_val = "NULL"
+
             sql_item = f"""
-            INSERT INTO order_items (order_id, product_id, quantity, unit_price, line_total)
-            VALUES ({order_id}, {p_id}, {qty}, {uprice:.2f}, {ltotal:.2f});
+            INSERT INTO order_items (order_id, product_id, quantity, unit_price, line_total, item_type, item_description)
+            VALUES ({order_id}, {p_id_val}, {qty}, {uprice:.2f}, {ltotal:.2f}, '{itype}', {idesc_val});
             """
             execute_sql(sql_item)
         return True

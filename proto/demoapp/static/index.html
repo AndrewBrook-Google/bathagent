@@ -609,19 +609,290 @@
     color: #fff !important;
   }
 
-  /* Spinner */
-  .spinner {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    border: 2px solid rgba(168, 199, 250, 0.3);
-    border-radius: 50%;
-    border-top-color: var(--gemini-light-blue);
-    animation: spin 0.8s linear infinite;
+  /* View Mode Switcher */
+  .view-switch {
+    display: flex;
+    background: #111213;
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
+    padding: 3px;
+    gap: 4px;
   }
 
-  @keyframes spin {
-    to { transform: rotate(360deg); }
+  .view-tab {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .view-tab:hover {
+    color: var(--text-primary);
+  }
+
+  .view-tab.active {
+    background: var(--bg-surface-hover);
+    color: var(--gemini-light-blue);
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+
+  /* Order Inspector Container */
+  .lookup-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 64px);
+    overflow-y: auto;
+    padding: 24px 32px;
+    max-width: 1080px;
+    margin: 0 auto;
+    width: 100%;
+    gap: 20px;
+  }
+
+  .lookup-search-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+
+  .lookup-search-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #111213;
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 6px 14px;
+    transition: border-color 0.2s;
+  }
+
+  .lookup-search-input-wrap:focus-within {
+    border-color: var(--gemini-light-blue);
+  }
+
+  .lookup-search-input-wrap input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-size: 15px;
+    font-family: var(--font-sans);
+    padding: 6px 0;
+  }
+
+  .btn-lookup-search {
+    background: var(--gemini-blue);
+    color: #0b1528;
+    font-weight: 600;
+    font-size: 13px;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .btn-lookup-search:hover {
+    background: #bcd4fe;
+  }
+
+  .quick-lookup-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .quick-lbl {
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+
+  .quick-chip {
+    background: #202124;
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 3px 10px;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    transition: all 0.2s;
+  }
+
+  .quick-chip:hover {
+    border-color: var(--gemini-light-blue);
+    color: var(--gemini-light-blue);
+    background: rgba(168, 199, 250, 0.08);
+  }
+
+  /* Order Detail Cards */
+  .order-detail-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .order-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 16px;
+  }
+
+  .order-title-block {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .order-title-block h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    background: #111213;
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .meta-item .lbl {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-tertiary);
+  }
+
+  .meta-item .val {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  /* Items Table */
+  .items-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    text-align: left;
+  }
+
+  .items-table th {
+    background: #111213;
+    color: var(--text-tertiary);
+    font-weight: 600;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .items-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+  }
+
+  .items-table tr:hover {
+    background: rgba(255,255,255,0.02);
+  }
+
+  .type-badge {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    font-family: var(--font-mono);
+  }
+
+  .type-badge.PRODUCT { background: rgba(168, 199, 250, 0.15); color: #a8c7fa; border: 1px solid rgba(168, 199, 250, 0.3); }
+  .type-badge.TAX { background: rgba(253, 214, 99, 0.15); color: #fdd663; border: 1px solid rgba(253, 214, 99, 0.3); }
+  .type-badge.SHIPPING { background: rgba(218, 180, 255, 0.15); color: #dab4ff; border: 1px solid rgba(218, 180, 255, 0.3); }
+  .type-badge.FEE { background: rgba(255, 138, 101, 0.15); color: #ff8a65; border: 1px solid rgba(255, 138, 101, 0.3); }
+  .type-badge.CREDIT { background: rgba(129, 201, 149, 0.15); color: #81c995; border: 1px solid rgba(129, 201, 149, 0.3); }
+
+  /* Financial Summary */
+  .financial-summary {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+  }
+
+  .fin-box {
+    background: #111213;
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 16px 20px;
+    width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .fin-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .fin-row.total {
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .fin-row.outstanding {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--status-warn);
+  }
+
+  .fin-row.paid {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--status-ok);
   }
 </style>
 </head>
@@ -634,6 +905,12 @@
       <h1>BathAgent</h1>
     </div>
     <span class="tag">Gemini Enterprise</span>
+  </div>
+
+  <!-- View Switcher -->
+  <div class="view-switch">
+    <button id="btn-view-chat" class="view-tab active" onclick="switchView('chat')">💬 Assistant Chat</button>
+    <button id="btn-view-lookup" class="view-tab" onclick="switchView('lookup')">🔍 Order Inspector</button>
   </div>
 
   <div class="header-metrics">
@@ -658,7 +935,7 @@
 
 <main>
   <!-- Chat Panel -->
-  <div class="chat-container">
+  <div class="chat-container" id="chat-panel">
     <div id="chat">
       <!-- Welcome Intro Box -->
       <div class="welcome-box" id="welcome-box">
@@ -697,6 +974,38 @@
             <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
           </svg>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order Inspector Panel -->
+  <div class="lookup-container" id="lookup-panel" style="display:none;">
+    <div class="lookup-search-card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h2 style="font-size:17px; font-weight:700; color:var(--text-primary); margin:0 0 4px 0;">Order Inspector</h2>
+          <p style="font-size:12.5px; color:var(--text-tertiary); margin:0;">Direct read-only breakdown of line items, taxes, shipping, fees, credits, and customer metadata from live AlloyDB tables.</p>
+        </div>
+      </div>
+      <div class="lookup-search-input-wrap">
+        <span style="font-size:16px; color:var(--text-secondary);">🔍</span>
+        <input type="number" id="lookup-order-id" placeholder="Type Order ID (e.g. 1499, 1500, 2736)..." onkeydown="if(event.key==='Enter')inspectOrder()">
+        <button class="btn-lookup-search" onclick="inspectOrder()">Inspect Order</button>
+      </div>
+      <div class="quick-lookup-row">
+        <span class="quick-lbl">Quick Lookups:</span>
+        <span class="quick-chip" onclick="quickInspect(1)">#1</span>
+        <span class="quick-chip" onclick="quickInspect(1498)">#1498</span>
+        <span class="quick-chip" onclick="quickInspect(1499)">#1499</span>
+        <span class="quick-chip" onclick="quickInspect(1500)">#1500</span>
+        <span class="quick-chip" onclick="quickInspect(2736)">#2736</span>
+      </div>
+    </div>
+
+    <!-- Results Area -->
+    <div id="lookup-results-area">
+      <div style="text-align:center; padding:40px; color:var(--text-tertiary); font-size:13.5px; background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:16px;">
+        Type an Order ID above or click a quick lookup chip to inspect complete order details.
       </div>
     </div>
   </div>
@@ -955,6 +1264,183 @@ async function pollFollowUps() {
       if (r.messages.length) updateStats();
     }
   } catch(e) {}
+}
+
+// ---------------------------------------------------------------- View Switcher & Order Inspector
+function switchView(mode) {
+  if (mode === 'chat') {
+    $('chat-panel').style.display = 'flex';
+    $('lookup-panel').style.display = 'none';
+    $('btn-view-chat').classList.add('active');
+    $('btn-view-lookup').classList.remove('active');
+  } else {
+    $('chat-panel').style.display = 'none';
+    $('lookup-panel').style.display = 'flex';
+    $('btn-view-chat').classList.remove('active');
+    $('btn-view-lookup').classList.add('active');
+    $('lookup-order-id').focus();
+  }
+}
+
+function quickInspect(id) {
+  $('lookup-order-id').value = id;
+  inspectOrder();
+}
+
+async function inspectOrder() {
+  const input = $('lookup-order-id');
+  const oid = input.value.trim();
+  if (!oid) return;
+
+  const area = $('lookup-results-area');
+  area.innerHTML = `
+    <div style="text-align:center; padding:40px; color:var(--gemini-light-blue); background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:16px;">
+      <span class="spinner"></span> Loading Order #${esc(oid)} from AlloyDB bathstuff-prod...
+    </div>
+  `;
+
+  try {
+    const res = await api(`/api/orders/${encodeURIComponent(oid)}`);
+    if (!res || !res.ok) {
+      area.innerHTML = `
+        <div style="padding:24px; color:var(--status-bad); background:rgba(242, 139, 130, 0.08); border:1px solid rgba(242, 139, 130, 0.3); border-radius:16px;">
+          <b>Lookup Error:</b> ${esc(res ? res.error : 'Failed to retrieve order.')}
+        </div>
+      `;
+      return;
+    }
+
+    const ord = res.order || {};
+    const bd = res.breakdown || {};
+    const items = res.items || [];
+
+    const orderDateStr = ord.order_date ? ord.order_date.replace('T', ' ').replace('Z', ' UTC').slice(0, 23) : '—';
+    const shipDateStr = ord.ship_date ? ord.ship_date.replace('T', ' ').replace('Z', ' UTC').slice(0, 23) : 'Not Shipped Yet';
+
+    let itemsRows = items.map(it => {
+      const type = (it.item_type || 'PRODUCT').toUpperCase();
+      let nameDesc = '';
+      if (type === 'PRODUCT') {
+        nameDesc = `<b>${esc(it.product_name || 'Product')}</b> <span style="color:var(--text-tertiary); font-size:11px;">(${esc(it.sku || 'SKU')})</span>`;
+      } else {
+        nameDesc = `<b>${esc(it.item_description || it.product_name || type)}</b>`;
+      }
+
+      const qty = it.quantity || 1;
+      const unit = Number(it.unit_price || 0).toFixed(2);
+      const total = Number(it.line_total || 0).toFixed(2);
+
+      return `
+        <tr>
+          <td><span class="type-badge ${type}">${type}</span></td>
+          <td>${nameDesc}</td>
+          <td style="text-align:center; font-family:var(--font-mono);">${qty}</td>
+          <td style="text-align:right; font-family:var(--font-mono);">$${unit}</td>
+          <td style="text-align:right; font-weight:600; font-family:var(--font-mono);">$${total}</td>
+        </tr>
+      `;
+    }).join('');
+
+    area.innerHTML = `
+      <div class="order-detail-card">
+        <div class="order-header-row">
+          <div class="order-title-block">
+            <h2>Order #${esc(ord.order_id)}</h2>
+            <span class="status-pill ${esc(ord.status)}">${esc(ord.status)}</span>
+          </div>
+          <div style="font-size:13px; color:var(--text-secondary);">
+            Customer: <b>${esc(ord.full_name || 'Customer #' + ord.customer_id)}</b> · <b>${esc(ord.shipping_country || 'USA')}</b>
+          </div>
+        </div>
+
+        <div class="meta-grid">
+          <div class="meta-item">
+            <span class="lbl">Customer Email</span>
+            <span class="val">${esc(ord.email || '—')}</span>
+          </div>
+          <div class="meta-item">
+            <span class="lbl">Order Placed</span>
+            <span class="val">${orderDateStr}</span>
+          </div>
+          <div class="meta-item">
+            <span class="lbl">Ship Date</span>
+            <span class="val">${shipDateStr}</span>
+          </div>
+          <div class="meta-item">
+            <span class="lbl">Payment Status</span>
+            <span class="val" style="color:${Number(ord.total_outstanding) > 0 ? 'var(--status-warn)' : 'var(--status-ok)'}; font-weight:600;">
+              ${Number(ord.total_outstanding) > 0 ? 'Outstanding ($' + Number(ord.total_outstanding).toFixed(2) + ')' : 'Fully Paid ✅'}
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <h3 style="font-size:14px; font-weight:600; color:var(--text-secondary); margin:0 0 12px 0;">Itemized Breakdown</h3>
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th style="width:110px;">Item Type</th>
+                <th>Item / Description</th>
+                <th style="width:70px; text-align:center;">Qty</th>
+                <th style="width:100px; text-align:right;">Unit Price</th>
+                <th style="width:110px; text-align:right;">Line Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsRows}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="financial-summary">
+          <div class="fin-box">
+            <div class="fin-row">
+              <span>Products Subtotal</span>
+              <span style="font-family:var(--font-mono);">$${Number(bd.product_subtotal || 0).toFixed(2)}</span>
+            </div>
+            <div class="fin-row">
+              <span>Sales Tax</span>
+              <span style="font-family:var(--font-mono); color:#fdd663;">+$${Number(bd.tax_total || 0).toFixed(2)}</span>
+            </div>
+            <div class="fin-row">
+              <span>Shipping & Handling</span>
+              <span style="font-family:var(--font-mono); color:#dab4ff;">+$${Number(bd.shipping_total || 0).toFixed(2)}</span>
+            </div>
+            ${Number(bd.fee_total) > 0 ? `
+              <div class="fin-row">
+                <span>Fees (Rush Handling)</span>
+                <span style="font-family:var(--font-mono); color:#ff8a65;">+$${Number(bd.fee_total).toFixed(2)}</span>
+              </div>
+            ` : ''}
+            ${Number(bd.credit_total) > 0 ? `
+              <div class="fin-row">
+                <span>Credits Applied</span>
+                <span style="font-family:var(--font-mono); color:#81c995;">-$${Number(bd.credit_total).toFixed(2)}</span>
+              </div>
+            ` : ''}
+            <div class="fin-row total">
+              <span>Total Order Amount</span>
+              <span style="font-family:var(--font-mono); color:var(--gemini-light-blue); font-size:16px;">$${Number(bd.total_amount || ord.total_price || 0).toFixed(2)}</span>
+            </div>
+            <div class="fin-row paid">
+              <span>Amount Paid</span>
+              <span style="font-family:var(--font-mono);">$${Number(bd.amount_paid || ord.amount_paid || 0).toFixed(2)}</span>
+            </div>
+            <div class="fin-row outstanding">
+              <span>Total Outstanding</span>
+              <span style="font-family:var(--font-mono);">$${Number(bd.total_outstanding || ord.total_outstanding || 0).toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  } catch(err) {
+    area.innerHTML = `
+      <div style="padding:24px; color:var(--status-bad); background:rgba(242, 139, 130, 0.08); border:1px solid rgba(242, 139, 130, 0.3); border-radius:16px;">
+        <b>Error:</b> ${esc(err)}
+      </div>
+    `;
+  }
 }
 
 updateStats();
