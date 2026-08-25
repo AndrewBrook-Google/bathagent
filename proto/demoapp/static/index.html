@@ -789,7 +789,7 @@
       <!-- Welcome Intro Box without suggested queries -->
       <div class="welcome-box" id="welcome-box">
         <h2><span>✦</span> Welcome to BathAgent</h2>
-        <p>Your enterprise AI assistant grounded in the live BathStuff AlloyDB cluster. Inquire about orders, customer history, catalog pricing, or request safe order updates via Wildfire transaction safety.</p>
+        <p>I am currently connected to <b>bathstuff-prod</b>.  How can I help you today?</p>
       </div>
     </div>
 
@@ -1079,7 +1079,7 @@ async function newChat() {
   welcome.className = 'welcome-box';
   welcome.innerHTML = `
     <h2><span>✦</span> Welcome to BathAgent</h2>
-    <p>Fresh session initialized. All inquiries and mutations run against live <b>bathstuff-prod</b> AlloyDB tables with zero hallucination.</p>
+    <p>I am currently connected to <b>bathstuff-prod</b>.  How can I help you today?</p>
   `;
   $('chat').appendChild(welcome);
   $('say').focus();
