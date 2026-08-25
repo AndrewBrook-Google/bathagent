@@ -66,10 +66,16 @@ class NewChatReq(BaseModel):
 
 
 @app.post("/api/chat/new")
-def chat_new(req: NewChatReq):
+def chat_new(req: NewChatReq = None):
     global SESSION
+    if SESSION and getattr(SESSION, "reader_id", None):
+        try:
+            # Cleanly resync / release branch in Wildfire
+            console(f"/api/branches/{SESSION.reader_id}/resync", {})
+        except Exception:
+            pass
     SESSION = agent.ChatSession(role="bathagent", actor="bathagent-chat")
-    return {"ok": True, "agent": "bathagent"}
+    return {"ok": True, "agent": "bathagent", "message": "Session reset successfully"}
 
 
 @app.get("/api/agents")

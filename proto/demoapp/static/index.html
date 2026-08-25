@@ -595,6 +595,20 @@
     background: rgba(168, 199, 250, 0.16);
   }
 
+  .btn-new-chat-top {
+    background: rgba(168, 199, 250, 0.15) !important;
+    border: 1px solid rgba(168, 199, 250, 0.35) !important;
+    color: var(--gemini-light-blue) !important;
+    font-weight: 600 !important;
+    cursor: pointer;
+  }
+
+  .btn-new-chat-top:hover {
+    background: rgba(168, 199, 250, 0.28) !important;
+    border-color: #fff !important;
+    color: #fff !important;
+  }
+
   /* Spinner */
   .spinner {
     display: inline-block;
@@ -631,6 +645,9 @@
   </div>
 
   <div class="header-links">
+    <button class="nav-btn btn-new-chat-top" onclick="newChat()" title="Start a fresh chat session and reset Wildfire validation history">
+      <span>✦</span> New Chat Session
+    </button>
     <a href="http://localhost:8779/" target="_blank" class="nav-btn">
       <span>📊</span> Business Simulator ↗
     </a>
