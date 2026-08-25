@@ -61,6 +61,7 @@
     border-bottom: 1px solid var(--border-subtle);
     gap: 16px;
     z-index: 10;
+    flex-shrink: 0;
   }
 
   .brand {
@@ -101,12 +102,10 @@
     border: 1px solid var(--border-subtle);
   }
 
-  .header-metrics {
+  .header-center {
     display: flex;
     align-items: center;
     gap: 14px;
-    font-size: 12.5px;
-    color: var(--text-secondary);
   }
 
   .db-badge {
@@ -155,6 +154,7 @@
     display: flex;
     align-items: center;
     gap: 5px;
+    cursor: pointer;
   }
 
   .nav-btn:hover {
@@ -162,17 +162,31 @@
     border-color: var(--gemini-light-blue);
   }
 
-  /* Main Layout */
+  .btn-new-chat-top {
+    background: rgba(168, 199, 250, 0.15) !important;
+    border: 1px solid rgba(168, 199, 250, 0.35) !important;
+    color: var(--gemini-light-blue) !important;
+    font-weight: 600 !important;
+  }
+
+  .btn-new-chat-top:hover {
+    background: rgba(168, 199, 250, 0.28) !important;
+    border-color: #fff !important;
+    color: #fff !important;
+  }
+
+  /* Main Side-by-Side Layout */
   main {
     flex: 1;
     display: grid;
-    grid-template-columns: 1fr 340px;
+    grid-template-columns: minmax(380px, 1fr) minmax(440px, 1.15fr);
     min-height: 0;
     gap: 0;
     background: var(--bg-base);
+    overflow: hidden;
   }
 
-  /* Chat Pane */
+  /* Left Pane: Chat Container */
   .chat-container {
     display: flex;
     flex-direction: column;
@@ -180,37 +194,38 @@
     min-height: 0;
     position: relative;
     border-right: 1px solid var(--border-subtle);
+    background: var(--bg-base);
   }
 
   #chat {
     flex: 1;
     overflow-y: auto;
-    padding: 24px 32px;
+    padding: 24px 28px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 18px;
     scroll-behavior: smooth;
   }
 
   /* Welcome Card */
   .welcome-box {
     align-self: center;
-    max-width: 680px;
+    max-width: 600px;
     width: 100%;
     background: var(--bg-surface);
     border: 1px solid var(--border-subtle);
-    border-radius: 16px;
-    padding: 24px;
-    margin: 20px 0;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin: 16px 0;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
   }
 
   .welcome-box h2 {
     font-family: var(--font-heading);
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 600;
     color: var(--text-primary);
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -219,57 +234,14 @@
   .welcome-box p {
     color: var(--text-secondary);
     font-size: 13.5px;
-    margin-bottom: 16px;
+    line-height: 1.5;
   }
 
-  .chips-label {
-    font-size: 11.5px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-tertiary);
-    font-weight: 600;
-    margin-bottom: 8px;
-  }
-
-  .prompt-chips {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .chip {
-    background: var(--bg-surface-hover);
-    border: 1px solid var(--border-subtle);
-    border-radius: 10px;
-    padding: 10px 14px;
-    color: var(--text-primary);
-    font-size: 13px;
-    cursor: pointer;
-    text-align: left;
-    transition: all 0.15s ease;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .chip:hover {
-    background: #303338;
-    border-color: var(--gemini-light-blue);
-    transform: translateY(-1px);
-  }
-
-  .chip .arrow {
-    color: var(--gemini-light-blue);
-    font-size: 14px;
-  }
-
-  /* Message Bubbles */
+  /* Chat Messages */
   .msg-row {
     display: flex;
     gap: 12px;
-    max-width: 820px;
     width: 100%;
-    margin: 0 auto;
   }
 
   .msg-row.user-row {
@@ -277,13 +249,13 @@
   }
 
   .avatar {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
+    font-size: 13px;
     flex-shrink: 0;
     margin-top: 2px;
   }
@@ -291,26 +263,27 @@
   .avatar.agent-av {
     background: var(--gemini-spark);
     color: #fff;
-    box-shadow: 0 0 10px rgba(161, 66, 244, 0.25);
+    font-weight: bold;
+    box-shadow: 0 2px 8px rgba(161, 66, 244, 0.25);
   }
 
   .avatar.user-av {
     background: #3c4043;
-    color: #e3e3e3;
+    color: var(--text-primary);
   }
 
   .msg-body {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    max-width: calc(100% - 48px);
+    max-width: calc(100% - 42px);
   }
 
   .bubble {
-    padding: 12px 18px;
+    padding: 12px 16px;
     border-radius: 16px;
-    font-size: 14px;
-    line-height: 1.6;
+    font-size: 13.5px;
+    line-height: 1.55;
     word-break: break-word;
     white-space: pre-wrap;
   }
@@ -333,7 +306,7 @@
     background: none;
     border: none;
     color: var(--text-tertiary);
-    font-size: 12.5px;
+    font-size: 12px;
     padding: 4px 8px;
     align-self: center;
     text-align: center;
@@ -341,19 +314,19 @@
 
   /* Tool steps & reasoning */
   .reasoning-panel {
-    margin: 6px 0 10px 0;
+    margin: 4px 0 8px 0;
     background: #18191a;
     border: 1px solid var(--border-subtle);
     border-radius: 10px;
     overflow: hidden;
-    font-size: 12.5px;
+    font-size: 12px;
   }
 
   .reasoning-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 7px 12px;
     background: var(--bg-surface);
     cursor: pointer;
     user-select: none;
@@ -367,10 +340,10 @@
   }
 
   .reasoning-content {
-    padding: 10px 14px;
+    padding: 8px 12px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     border-top: 1px solid var(--border-subtle);
   }
 
@@ -378,7 +351,7 @@
     font-family: var(--font-mono);
     font-size: 11.5px;
     color: var(--text-secondary);
-    padding: 6px 8px;
+    padding: 5px 8px;
     background: #111213;
     border-radius: 6px;
     border-left: 3px solid var(--gemini-light-blue);
@@ -398,18 +371,18 @@
 
   .step-item .obs {
     color: var(--text-tertiary);
-    margin-top: 4px;
+    margin-top: 3px;
     display: block;
     word-break: break-all;
   }
 
   /* Chat Input Bar */
   .input-area {
-    padding: 16px 32px 24px 32px;
+    padding: 14px 20px 18px 20px;
     background: transparent;
-    max-width: 820px;
     width: 100%;
     margin: 0 auto;
+    flex-shrink: 0;
   }
 
   .input-capsule {
@@ -418,7 +391,7 @@
     background: var(--bg-surface);
     border: 1px solid var(--border-subtle);
     border-radius: 28px;
-    padding: 6px 8px 6px 20px;
+    padding: 5px 8px 5px 18px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.25);
     transition: border-color 0.2s, box-shadow 0.2s;
   }
@@ -435,8 +408,8 @@
     outline: none;
     color: var(--text-primary);
     font-family: var(--font-sans);
-    font-size: 14.5px;
-    padding: 8px 4px;
+    font-size: 14px;
+    padding: 7px 4px;
   }
 
   .input-capsule input::placeholder {
@@ -444,8 +417,8 @@
   }
 
   .send-btn {
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     background: var(--gemini-blue);
     border: none;
@@ -470,214 +443,51 @@
     transform: none;
   }
 
-  /* Right Sidebar */
-  .sidebar {
-    background: var(--bg-surface);
-    display: flex;
-    flex-direction: column;
-    padding: 20px;
-    gap: 18px;
-    overflow-y: auto;
-  }
-
-  .side-card {
-    background: var(--bg-surface-elevated);
-    border: 1px solid var(--border-subtle);
-    border-radius: 12px;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .side-card h3 {
-    font-family: var(--font-heading);
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-tertiary);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .stat-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-
-  .stat-tile {
-    background: var(--bg-base);
-    border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    padding: 10px 12px;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .stat-tile .num {
-    font-family: var(--font-heading);
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--gemini-light-blue);
-  }
-
-  .stat-tile .lbl {
-    font-size: 11px;
-    color: var(--text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-top: 2px;
-  }
-
-  .safety-info {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    font-size: 12.5px;
-    color: var(--text-secondary);
-  }
-
-  .safety-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-  }
-
-  .safety-item:last-child {
-    border-bottom: none;
-  }
-
-  .badge-val {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    background: #131314;
-    padding: 2px 6px;
-    border-radius: 4px;
-    border: 1px solid var(--border-subtle);
-  }
-
-  .btn-reset {
-    background: transparent;
-    color: var(--status-bad);
-    border: 1px solid rgba(242, 139, 130, 0.3);
-    border-radius: 8px;
-    padding: 8px 12px;
-    cursor: pointer;
-    font-size: 12.5px;
-    font-weight: 500;
-    text-align: center;
-    transition: all 0.2s;
-  }
-
-  .btn-reset:hover {
-    background: rgba(242, 139, 130, 0.1);
-    border-color: var(--status-bad);
-  }
-
-  .btn-new-chat {
-    background: rgba(168, 199, 250, 0.08);
-    color: var(--gemini-light-blue);
-    border: 1px solid rgba(168, 199, 250, 0.25);
-    border-radius: 8px;
-    padding: 8px 12px;
-    cursor: pointer;
-    font-size: 12.5px;
-    font-weight: 500;
-    text-align: center;
-    transition: all 0.2s;
-  }
-
-  .btn-new-chat:hover {
-    background: rgba(168, 199, 250, 0.16);
-  }
-
-  .btn-new-chat-top {
-    background: rgba(168, 199, 250, 0.15) !important;
-    border: 1px solid rgba(168, 199, 250, 0.35) !important;
-    color: var(--gemini-light-blue) !important;
-    font-weight: 600 !important;
-    cursor: pointer;
-  }
-
-  .btn-new-chat-top:hover {
-    background: rgba(168, 199, 250, 0.28) !important;
-    border-color: #fff !important;
-    color: #fff !important;
-  }
-
-  /* View Mode Switcher */
-  .view-switch {
-    display: flex;
-    background: #111213;
-    border: 1px solid var(--border-subtle);
-    border-radius: 20px;
-    padding: 3px;
-    gap: 4px;
-  }
-
-  .view-tab {
-    background: transparent;
-    border: none;
-    color: var(--text-secondary);
-    font-size: 12.5px;
-    font-weight: 500;
-    padding: 6px 14px;
-    border-radius: 16px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .view-tab:hover {
-    color: var(--text-primary);
-  }
-
-  .view-tab.active {
-    background: var(--bg-surface-hover);
-    color: var(--gemini-light-blue);
-    font-weight: 600;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-  }
-
-  /* Order Inspector Container */
+  /* Right Pane: Order Inspector */
   .lookup-container {
-    flex: 1;
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 64px);
+    height: 100%;
+    min-height: 0;
     overflow-y: auto;
-    padding: 24px 32px;
-    max-width: 1080px;
-    margin: 0 auto;
-    width: 100%;
-    gap: 20px;
+    padding: 20px 24px;
+    gap: 16px;
+    background: #141517;
   }
 
   .lookup-search-card {
     background: var(--bg-surface);
     border: 1px solid var(--border-subtle);
-    border-radius: 16px;
-    padding: 20px 24px;
+    border-radius: 14px;
+    padding: 16px 20px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    flex-shrink: 0;
+  }
+
+  .lookup-search-header h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 2px 0;
+  }
+
+  .lookup-search-header p {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin: 0;
   }
 
   .lookup-search-input-wrap {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     background: #111213;
     border: 1px solid var(--border-subtle);
-    border-radius: 12px;
-    padding: 6px 14px;
+    border-radius: 10px;
+    padding: 5px 12px;
     transition: border-color 0.2s;
   }
 
@@ -691,7 +501,7 @@
     border: none;
     outline: none;
     color: var(--text-primary);
-    font-size: 15px;
+    font-size: 14px;
     font-family: var(--font-sans);
     padding: 6px 0;
   }
@@ -700,10 +510,10 @@
     background: var(--gemini-blue);
     color: #0b1528;
     font-weight: 600;
-    font-size: 13px;
+    font-size: 12.5px;
     border: none;
-    border-radius: 8px;
-    padding: 8px 16px;
+    border-radius: 7px;
+    padding: 7px 14px;
     cursor: pointer;
     transition: background 0.2s;
   }
@@ -715,21 +525,21 @@
   .quick-lookup-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
   }
 
   .quick-lbl {
-    font-size: 12px;
+    font-size: 11.5px;
     color: var(--text-tertiary);
   }
 
   .quick-chip {
     background: #202124;
     border: 1px solid var(--border-subtle);
-    border-radius: 12px;
-    padding: 3px 10px;
-    font-size: 11.5px;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 11px;
     color: var(--text-secondary);
     cursor: pointer;
     font-family: var(--font-mono);
@@ -742,15 +552,15 @@
     background: rgba(168, 199, 250, 0.08);
   }
 
-  /* Order Detail Cards */
+  /* Order Detail Card */
   .order-detail-card {
     background: var(--bg-surface);
     border: 1px solid var(--border-subtle);
-    border-radius: 16px;
-    padding: 24px;
+    border-radius: 14px;
+    padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
   }
 
   .order-header-row {
@@ -758,49 +568,79 @@
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 10px;
     border-bottom: 1px solid var(--border-subtle);
-    padding-bottom: 16px;
+    padding-bottom: 14px;
   }
 
   .order-title-block {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
   }
 
   .order-title-block h2 {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
     color: var(--text-primary);
     margin: 0;
   }
 
+  .status-pill {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: rgba(168, 199, 250, 0.15);
+    color: var(--gemini-light-blue);
+    border: 1px solid rgba(168, 199, 250, 0.3);
+  }
+
+  .status-pill.DELIVERED {
+    background: rgba(109, 213, 140, 0.15);
+    color: var(--status-ok);
+    border-color: rgba(109, 213, 140, 0.3);
+  }
+
+  .status-pill.PROCESSING {
+    background: rgba(253, 226, 147, 0.15);
+    color: var(--status-warn);
+    border-color: rgba(253, 226, 147, 0.3);
+  }
+
+  .status-pill.CANCELLED {
+    background: rgba(242, 139, 130, 0.15);
+    color: var(--status-bad);
+    border-color: rgba(242, 139, 130, 0.3);
+  }
+
   .meta-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 10px;
     background: #111213;
     border: 1px solid var(--border-subtle);
-    border-radius: 12px;
-    padding: 16px;
+    border-radius: 10px;
+    padding: 12px 14px;
   }
 
   .meta-item {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
   }
 
   .meta-item .lbl {
-    font-size: 11px;
+    font-size: 10.5px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--text-tertiary);
   }
 
   .meta-item .val {
-    font-size: 13.5px;
+    font-size: 13px;
     font-weight: 500;
     color: var(--text-primary);
   }
@@ -809,7 +649,7 @@
   .items-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: 12.5px;
     text-align: left;
   }
 
@@ -817,15 +657,15 @@
     background: #111213;
     color: var(--text-tertiary);
     font-weight: 600;
-    font-size: 11.5px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    padding: 10px 14px;
+    padding: 8px 10px;
     border-bottom: 1px solid var(--border-subtle);
   }
 
   .items-table td {
-    padding: 12px 14px;
+    padding: 10px 10px;
     border-bottom: 1px solid var(--border-subtle);
     color: var(--text-primary);
   }
@@ -836,9 +676,9 @@
 
   .type-badge {
     display: inline-block;
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 700;
-    padding: 2px 7px;
+    padding: 2px 6px;
     border-radius: 4px;
     text-transform: uppercase;
     font-family: var(--font-mono);
@@ -854,45 +694,60 @@
   .financial-summary {
     display: flex;
     justify-content: flex-end;
-    margin-top: 10px;
+    margin-top: 6px;
   }
 
   .fin-box {
     background: #111213;
     border: 1px solid var(--border-subtle);
-    border-radius: 12px;
-    padding: 16px 20px;
-    width: 320px;
+    border-radius: 10px;
+    padding: 14px 18px;
+    width: 290px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
   }
 
   .fin-row {
     display: flex;
     justify-content: space-between;
-    font-size: 13px;
+    font-size: 12.5px;
     color: var(--text-secondary);
   }
 
   .fin-row.total {
     border-top: 1px solid var(--border-subtle);
-    padding-top: 8px;
-    font-size: 15px;
+    padding-top: 6px;
+    font-size: 14.5px;
     font-weight: 700;
     color: var(--text-primary);
   }
 
   .fin-row.outstanding {
-    font-size: 13.5px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--status-warn);
   }
 
   .fin-row.paid {
-    font-size: 13.5px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--status-ok);
+  }
+
+  /* Spinner */
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(168, 199, 250, 0.3);
+    border-radius: 50%;
+    border-top-color: var(--gemini-light-blue);
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 </style>
 </head>
@@ -907,13 +762,7 @@
     <span class="tag">Gemini Enterprise</span>
   </div>
 
-  <!-- View Switcher -->
-  <div class="view-switch">
-    <button id="btn-view-chat" class="view-tab active" onclick="switchView('chat')">💬 Assistant Chat</button>
-    <button id="btn-view-lookup" class="view-tab" onclick="switchView('lookup')">🔍 Order Inspector</button>
-  </div>
-
-  <div class="header-metrics">
+  <div class="header-center">
     <div class="db-badge">
       <div class="dot"></div>
       AlloyDB bathstuff-prod
@@ -934,33 +783,13 @@
 </header>
 
 <main>
-  <!-- Chat Panel -->
-  <div class="chat-container" id="chat-panel">
+  <!-- Left Pane: Chat Container -->
+  <div class="chat-container">
     <div id="chat">
-      <!-- Welcome Intro Box -->
+      <!-- Welcome Intro Box without suggested queries -->
       <div class="welcome-box" id="welcome-box">
         <h2><span>✦</span> Welcome to BathAgent</h2>
-        <p>Your enterprise AI assistant grounded in the live BathStuff AlloyDB cluster. Ask questions, look up order statuses, check catalog pricing, or request safe order modifications via Wildfire transaction safety.</p>
-        
-        <div class="chips-label">Suggested Queries</div>
-        <div class="prompt-chips">
-          <div class="chip" onclick="quickSend('How many total orders and customers are in the database, and what are the details of the latest order?')">
-            <span>📦 Show total orders, customers, and latest order details</span>
-            <span class="arrow">→</span>
-          </div>
-          <div class="chip" onclick="quickSend('What are the top 3 most expensive products currently in the catalog, including their names and prices?')">
-            <span>🏷 List top 3 most expensive products and their prices</span>
-            <span class="arrow">→</span>
-          </div>
-          <div class="chip" onclick="quickSend('Please look up order #1500: show customer ID, order date, total price, and status.')">
-            <span>🔍 Inspect details for Order #1500</span>
-            <span class="arrow">→</span>
-          </div>
-          <div class="chip" onclick="quickSend('Customer 1 requested to update order #1: adjust product 1 quantity to 3 units, recalculate line total, and submit for merge.')">
-            <span>✏️ Adjust Order #1 quantity to 3 units & submit via Wildfire</span>
-            <span class="arrow">→</span>
-          </div>
-        </div>
+        <p>Your enterprise AI assistant grounded in the live BathStuff AlloyDB cluster. Inquire about orders, customer history, catalog pricing, or request safe order updates via Wildfire transaction safety.</p>
       </div>
     </div>
 
@@ -978,17 +807,15 @@
     </div>
   </div>
 
-  <!-- Order Inspector Panel -->
-  <div class="lookup-container" id="lookup-panel" style="display:none;">
+  <!-- Right Pane: Order Inspector -->
+  <div class="lookup-container" id="lookup-panel">
     <div class="lookup-search-card">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div>
-          <h2 style="font-size:17px; font-weight:700; color:var(--text-primary); margin:0 0 4px 0;">Order Inspector</h2>
-          <p style="font-size:12.5px; color:var(--text-tertiary); margin:0;">Direct read-only breakdown of line items, taxes, shipping, fees, credits, and customer metadata from live AlloyDB tables.</p>
-        </div>
+      <div class="lookup-search-header">
+        <h2>Order Inspector</h2>
+        <p>Direct read-only view of line items, taxes, shipping, fees, credits, and customer info from live AlloyDB tables.</p>
       </div>
       <div class="lookup-search-input-wrap">
-        <span style="font-size:16px; color:var(--text-secondary);">🔍</span>
+        <span style="font-size:15px; color:var(--text-secondary);">🔍</span>
         <input type="number" id="lookup-order-id" placeholder="Type Order ID (e.g. 1499, 1500, 2736)..." onkeydown="if(event.key==='Enter')inspectOrder()">
         <button class="btn-lookup-search" onclick="inspectOrder()">Inspect Order</button>
       </div>
@@ -1004,68 +831,9 @@
 
     <!-- Results Area -->
     <div id="lookup-results-area">
-      <div style="text-align:center; padding:40px; color:var(--text-tertiary); font-size:13.5px; background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:16px;">
+      <div style="text-align:center; padding:40px 20px; color:var(--text-tertiary); font-size:13.5px; background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:14px;">
         Type an Order ID above or click a quick lookup chip to inspect complete order details.
       </div>
-    </div>
-  </div>
-
-  <!-- Right Sidebar -->
-  <div class="sidebar">
-    <!-- Live Database Snapshot -->
-    <div class="side-card">
-      <h3>
-        <span>Database Snapshot</span>
-        <span style="color:var(--status-ok); font-size:10px;">● LIVE</span>
-      </h3>
-      <div class="stat-grid">
-        <div class="stat-tile">
-          <span class="num" id="stat-orders">—</span>
-          <span class="lbl">Total Orders</span>
-        </div>
-        <div class="stat-tile">
-          <span class="num" id="stat-customers">250</span>
-          <span class="lbl">Customers</span>
-        </div>
-        <div class="stat-tile">
-          <span class="num" id="stat-products">40</span>
-          <span class="lbl">Catalog Products</span>
-        </div>
-        <div class="stat-tile">
-          <span class="num" id="stat-merges">—</span>
-          <span class="lbl">Wildfire Merges</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Safety & Architecture -->
-    <div class="side-card">
-      <h3>Enterprise Safety</h3>
-      <div class="safety-info">
-        <div class="safety-item">
-          <span>Target Engine</span>
-          <span class="badge-val" style="color:var(--status-ok)">AlloyDB PostgreSQL 18</span>
-        </div>
-        <div class="safety-item">
-          <span>Reasoning Model</span>
-          <span class="badge-val" style="color:var(--gemini-light-blue)">Gemini 2.5 Flash (ADC)</span>
-        </div>
-        <div class="safety-item">
-          <span>Write Safety</span>
-          <span class="badge-val">Isolated Sandbox Branches</span>
-        </div>
-        <div class="safety-item">
-          <span>Policy Protocol</span>
-          <span class="badge-val">Wildfire Writeback Engine</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Session Actions -->
-    <div class="side-card">
-      <h3>Session Controls</h3>
-      <button class="btn-new-chat" onclick="newChat()">✦ Start Fresh Session</button>
-      <button class="btn-reset" onclick="if(confirm('Reset all demo state, changesets, and chat?'))api('/api/sim/reset',{}).then(()=>newChat())">⟳ Reset Demo World</button>
     </div>
   </div>
 </main>
@@ -1080,11 +848,6 @@ const api = (u, b) => fetch(u, {
 
 function esc(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function quickSend(text) {
-  $('say').value = text;
-  send();
 }
 
 function appendUserMsg(text) {
@@ -1199,7 +962,6 @@ async function send() {
     $('say').disabled = false;
     $('send-btn').disabled = false;
     $('say').focus();
-    updateStats();
   }
 }
 
@@ -1207,50 +969,14 @@ async function newChat() {
   await api('/api/chat/new', {});
   $('chat').innerHTML = '';
   
-  // Re-append welcome box
   const welcome = document.createElement('div');
   welcome.className = 'welcome-box';
   welcome.innerHTML = `
     <h2><span>✦</span> Welcome to BathAgent</h2>
     <p>Fresh session initialized. All inquiries and mutations run against live <b>bathstuff-prod</b> AlloyDB tables with zero hallucination.</p>
-    <div class="chips-label">Suggested Queries</div>
-    <div class="prompt-chips">
-      <div class="chip" onclick="quickSend('How many total orders and customers are in the database, and what are the details of the latest order?')">
-        <span>📦 Show total orders, customers, and latest order details</span>
-        <span class="arrow">→</span>
-      </div>
-      <div class="chip" onclick="quickSend('What are the top 3 most expensive products currently in the catalog, including their names and prices?')">
-        <span>🏷 List top 3 most expensive products and their prices</span>
-        <span class="arrow">→</span>
-      </div>
-      <div class="chip" onclick="quickSend('Please look up order #1500: show customer ID, order date, total price, and status.')">
-        <span>🔍 Inspect details for Order #1500</span>
-        <span class="arrow">→</span>
-      </div>
-      <div class="chip" onclick="quickSend('Customer 1 requested to update order #1: adjust product 1 quantity to 3 units, recalculate line total, and submit for merge.')">
-        <span>✏️ Adjust Order #1 quantity to 3 units & submit via Wildfire</span>
-        <span class="arrow">→</span>
-      </div>
-    </div>
   `;
   $('chat').appendChild(welcome);
   $('say').focus();
-  updateStats();
-}
-
-async function updateStats() {
-  try {
-    const s = await api('/api/sim/state');
-    if (s && s.primary) {
-      const orders = s.primary.orders || 0;
-      const products = s.primary.products || 0;
-      const merges = s.primary.merged_actions || 0;
-      
-      $('stat-orders').textContent = Number(orders).toLocaleString();
-      $('stat-products').textContent = Number(products).toLocaleString();
-      $('stat-merges').textContent = Number(merges).toLocaleString();
-    }
-  } catch(e) {}
 }
 
 async function pollFollowUps() {
@@ -1261,27 +987,11 @@ async function pollFollowUps() {
         appendSystemMsg('↦ Human review decided in Wildfire console');
         appendAgentMsg(m);
       }
-      if (r.messages.length) updateStats();
     }
   } catch(e) {}
 }
 
-// ---------------------------------------------------------------- View Switcher & Order Inspector
-function switchView(mode) {
-  if (mode === 'chat') {
-    $('chat-panel').style.display = 'flex';
-    $('lookup-panel').style.display = 'none';
-    $('btn-view-chat').classList.add('active');
-    $('btn-view-lookup').classList.remove('active');
-  } else {
-    $('chat-panel').style.display = 'none';
-    $('lookup-panel').style.display = 'flex';
-    $('btn-view-chat').classList.remove('active');
-    $('btn-view-lookup').classList.add('active');
-    $('lookup-order-id').focus();
-  }
-}
-
+// ---------------------------------------------------------------- Order Inspector
 function quickInspect(id) {
   $('lookup-order-id').value = id;
   inspectOrder();
@@ -1294,7 +1004,7 @@ async function inspectOrder() {
 
   const area = $('lookup-results-area');
   area.innerHTML = `
-    <div style="text-align:center; padding:40px; color:var(--gemini-light-blue); background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:16px;">
+    <div style="text-align:center; padding:40px 20px; color:var(--gemini-light-blue); background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:14px;">
       <span class="spinner"></span> Loading Order #${esc(oid)} from AlloyDB bathstuff-prod...
     </div>
   `;
@@ -1303,7 +1013,7 @@ async function inspectOrder() {
     const res = await api(`/api/orders/${encodeURIComponent(oid)}`);
     if (!res || !res.ok) {
       area.innerHTML = `
-        <div style="padding:24px; color:var(--status-bad); background:rgba(242, 139, 130, 0.08); border:1px solid rgba(242, 139, 130, 0.3); border-radius:16px;">
+        <div style="padding:20px; color:var(--status-bad); background:rgba(242, 139, 130, 0.08); border:1px solid rgba(242, 139, 130, 0.3); border-radius:14px;">
           <b>Lookup Error:</b> ${esc(res ? res.error : 'Failed to retrieve order.')}
         </div>
       `;
@@ -1348,7 +1058,7 @@ async function inspectOrder() {
             <h2>Order #${esc(ord.order_id)}</h2>
             <span class="status-pill ${esc(ord.status)}">${esc(ord.status)}</span>
           </div>
-          <div style="font-size:13px; color:var(--text-secondary);">
+          <div style="font-size:12.5px; color:var(--text-secondary);">
             Customer: <b>${esc(ord.full_name || 'Customer #' + ord.customer_id)}</b> · <b>${esc(ord.shipping_country || 'USA')}</b>
           </div>
         </div>
@@ -1375,15 +1085,15 @@ async function inspectOrder() {
         </div>
 
         <div>
-          <h3 style="font-size:14px; font-weight:600; color:var(--text-secondary); margin:0 0 12px 0;">Itemized Breakdown</h3>
+          <h3 style="font-size:13px; font-weight:600; color:var(--text-secondary); margin:0 0 10px 0;">Itemized Breakdown</h3>
           <table class="items-table">
             <thead>
               <tr>
-                <th style="width:110px;">Item Type</th>
+                <th style="width:100px;">Item Type</th>
                 <th>Item / Description</th>
-                <th style="width:70px; text-align:center;">Qty</th>
-                <th style="width:100px; text-align:right;">Unit Price</th>
-                <th style="width:110px; text-align:right;">Line Total</th>
+                <th style="width:60px; text-align:center;">Qty</th>
+                <th style="width:90px; text-align:right;">Unit Price</th>
+                <th style="width:100px; text-align:right;">Line Total</th>
               </tr>
             </thead>
             <tbody>
@@ -1420,7 +1130,7 @@ async function inspectOrder() {
             ` : ''}
             <div class="fin-row total">
               <span>Total Order Amount</span>
-              <span style="font-family:var(--font-mono); color:var(--gemini-light-blue); font-size:16px;">$${Number(bd.total_amount || ord.total_price || 0).toFixed(2)}</span>
+              <span style="font-family:var(--font-mono); color:var(--gemini-light-blue); font-size:15px;">$${Number(bd.total_amount || ord.total_price || 0).toFixed(2)}</span>
             </div>
             <div class="fin-row paid">
               <span>Amount Paid</span>
@@ -1436,15 +1146,15 @@ async function inspectOrder() {
     `;
   } catch(err) {
     area.innerHTML = `
-      <div style="padding:24px; color:var(--status-bad); background:rgba(242, 139, 130, 0.08); border:1px solid rgba(242, 139, 130, 0.3); border-radius:16px;">
+      <div style="padding:20px; color:var(--status-bad); background:rgba(242, 139, 130, 0.08); border:1px solid rgba(242, 139, 130, 0.3); border-radius:14px;">
         <b>Error:</b> ${esc(err)}
       </div>
     `;
   }
 }
 
-updateStats();
-setInterval(updateStats, 4000);
+// Auto-load a sample order on start
+quickInspect(1499);
 setInterval(pollFollowUps, 3000);
 </script>
 </body>
