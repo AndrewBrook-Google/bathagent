@@ -471,29 +471,42 @@ class SimulatorEngine:
 
     def get_state(self) -> Dict[str, Any]:
         """Return live dashboard snapshot."""
-        # Top 30 recent orders for display
-        recent_orders = sorted(self.orders.values(), key=lambda o: o.order_id, reverse=True)[:30]
+        # Top 50 recent orders for display
+        recent_orders = sorted(self.orders.values(), key=lambda o: o.order_id, reverse=True)[:50]
         
-        # Calculate dynamic probabilities for display
-        unshipped_list = []
+        # Calculate dynamic probabilities and elapsed time for display queue
+        queue_list = []
         for o in recent_orders:
+            el_h = max(0.0, (self.sim_time - o.order_date).total_seconds() / 3600.0)
             if o.status == "PROCESSING":
-                el_h = (self.sim_time - o.order_date).total_seconds() / 3600.0
                 if el_h <= self.ship_min_hours:
                     p = 0.0
                 elif el_h >= self.ship_max_hours:
                     p = 100.0
                 else:
                     p = ((el_h - self.ship_min_hours) / (self.ship_max_hours - self.ship_min_hours)) * 100.0
-                od_dict = o.to_dict()
-                od_dict["elapsed_sim_hours"] = round(el_h, 2)
-                od_dict["current_ship_probability"] = round(p, 1)
-                unshipped_list.append(od_dict)
+            elif o.status in ("SHIPPED", "DELIVERED"):
+                p = 100.0
+            else:
+                p = 0.0
 
-        # Count active processing and shipped orders
+            od_dict = o.to_dict()
+            od_dict["elapsed_sim_hours"] = round(el_h, 2)
+            od_dict["current_ship_probability"] = round(p, 1)
+            queue_list.append(od_dict)
+
+        # Count active processing, shipped, and delivered orders
         processing_count = sum(1 for o in self.orders.values() if o.status == "PROCESSING")
         shipped_count = sum(1 for o in self.orders.values() if o.status == "SHIPPED")
         delivered_count = sum(1 for o in self.orders.values() if o.status == "DELIVERED")
+        total_revenue = sum(o.total_price for o in self.orders.values())
+        total_outstanding = sum(o.total_outstanding for o in self.orders.values())
+
+        # Live DB orders for the DB records tab
+        try:
+            db_orders = alloydb_client.get_latest_orders_from_alloydb(50)
+        except Exception:
+            db_orders = [o.to_dict() for o in recent_orders[:30]]
 
         return {
             "running": self.running,
@@ -509,16 +522,21 @@ class SimulatorEngine:
                 "partial_payment_prob": self.partial_payment_prob,
             },
             "stats": {
+                "total_orders": max(len(self.orders), self.next_order_id - 1),
                 "total_generated": self.total_generated,
                 "total_shipped": self.total_shipped,
                 "total_delivered": self.total_delivered,
                 "processing_count": processing_count,
                 "shipped_count": shipped_count,
                 "delivered_count": delivered_count,
+                "total_revenue": round(total_revenue, 2),
+                "total_outstanding": round(total_outstanding, 2),
                 "total_in_db": self.next_order_id - 1,
                 "total_customers": len(self.known_customers),
             },
-            "unshipped_orders": unshipped_list,
+            "queue": queue_list,
+            "unshipped_orders": [q for q in queue_list if q["status"] == "PROCESSING"],
+            "db_orders": db_orders,
             "events": self.events[:50],
         }
 

@@ -65,6 +65,23 @@ def get_state():
     return engine.ENGINE.get_state()
 
 
+@app.get("/api/orders")
+def get_orders(limit: int = 50):
+    try:
+        import alloydb_client
+        return alloydb_client.get_latest_orders_from_alloydb(limit)
+    except Exception:
+        return [o.to_dict() for o in list(engine.ENGINE.orders.values())[-limit:]]
+
+
+@app.get("/api/history")
+def get_history():
+    return {
+        "orders": [o.to_dict() for o in sorted(engine.ENGINE.orders.values(), key=lambda o: o.order_id, reverse=True)[:100]],
+        "events": engine.ENGINE.events[:100],
+    }
+
+
 @app.post("/api/control/start")
 def start_simulation():
     engine.ENGINE.start()
