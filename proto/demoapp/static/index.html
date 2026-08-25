@@ -909,6 +909,15 @@ function appendAgentMsg(text, steps) {
   $('chat').scrollTop = $('chat').scrollHeight;
 }
 
+function toggleReasoning(headerEl) {
+  const content = headerEl.nextElementSibling;
+  if (!content) return;
+  const isHidden = content.style.display === 'none' || !content.style.display;
+  content.style.display = isHidden ? 'flex' : 'none';
+  const arrow = headerEl.querySelector('.toggle-arrow');
+  if (arrow) arrow.textContent = isHidden ? '▲ hide' : '▼ details';
+}
+
 function appendSystemMsg(text) {
   const row = document.createElement('div');
   row.className = 'bubble system';
@@ -927,37 +936,134 @@ async function send() {
   
   appendUserMsg(text);
   
-  const spinnerId = 'spin-' + Date.now();
-  const loadingRow = document.createElement('div');
-  loadingRow.className = 'msg-row';
-  loadingRow.id = spinnerId;
-  loadingRow.innerHTML = `
+  const uid = Date.now();
+  const panelId = 'panel-' + uid;
+  const countId = 'count-' + uid;
+  const contentId = 'content-' + uid;
+  const bubbleId = 'bubble-' + uid;
+  const statusTextId = 'status-txt-' + uid;
+
+  const agentRow = document.createElement('div');
+  agentRow.className = 'msg-row';
+  agentRow.innerHTML = `
     <div class="avatar agent-av">✦</div>
     <div class="msg-body">
-      <div class="bubble agent" style="display:flex; align-items:center; gap:8px; color:var(--text-secondary);">
-        <div class="spinner"></div>
-        <span>Querying AlloyDB bathstuff-prod & reasoning…</span>
+      <div class="reasoning-panel" id="${panelId}">
+        <div class="reasoning-header" onclick="toggleReasoning(this)">
+          <span>⚡ <span id="${countId}">0</span> Grounded Reasoning & Tool Steps</span>
+          <span class="toggle-arrow" style="font-size:11px; opacity:0.8;">▼ details</span>
+        </div>
+        <div class="reasoning-content" id="${contentId}" style="display:none;"></div>
+      </div>
+      <div class="bubble agent" id="${bubbleId}">
+        <div style="display:flex; align-items:center; gap:8px; color:var(--text-secondary);">
+          <div class="spinner"></div>
+          <span id="${statusTextId}">Querying AlloyDB bathstuff-prod & reasoning…</span>
+        </div>
       </div>
     </div>
   `;
-  $('chat').appendChild(loadingRow);
+  $('chat').appendChild(agentRow);
   $('chat').scrollTop = $('chat').scrollHeight;
 
+  const panelEl = $(panelId);
+  const countEl = $(countId);
+  const contentEl = $(contentId);
+  const bubbleEl = $(bubbleId);
+  const statusTextEl = $(statusTextId);
+
+  let stepCount = 0;
+
   try {
-    const res = await api('/api/chat', { message: text });
-    loadingRow.remove();
-    if (res && res.steps) {
-      for (const s of res.steps) {
-        if (s.traceback) {
-          console.error('[BathAgent Backend Traceback]:\n' + s.traceback);
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    });
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // Retain incomplete line
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const jsonStr = line.slice(6).trim();
+        if (!jsonStr) continue;
+
+        try {
+          const ev = JSON.parse(jsonStr);
+
+          if (ev.type === 'step_start') {
+            stepCount = ev.step_idx || (stepCount + 1);
+            countEl.textContent = stepCount;
+
+            const isWrite = ev.action === 'write' || ev.action === 'start_write_session';
+            const isSubmit = ev.action === 'submit';
+            const cls = isWrite ? 'step-item write-step' : isSubmit ? 'step-item submit-step' : 'step-item';
+
+            const thoughtHtml = ev.thought ? `<div style="color:var(--text-secondary); margin-bottom:4px; font-style:italic;">💭 ${esc(ev.thought)}</div>` : '';
+            const stepDiv = document.createElement('div');
+            stepDiv.className = cls;
+            stepDiv.id = `step-${uid}-${stepCount}`;
+            stepDiv.innerHTML = `
+              ${thoughtHtml}
+              <b>${esc(ev.action)}</b>(${esc(JSON.stringify(ev.args || {}))})
+              <span class="obs" style="font-style:italic; opacity:0.75;">↳ Executing…</span>
+            `;
+            contentEl.appendChild(stepDiv);
+
+            if (statusTextEl) {
+              if (ev.action === 'query') {
+                statusTextEl.textContent = `Step ${stepCount}: Querying AlloyDB bathstuff-prod…`;
+              } else if (ev.action === 'start_write_session') {
+                statusTextEl.textContent = `Step ${stepCount}: Detaching sandbox branch in Wildfire…`;
+              } else if (ev.action === 'write') {
+                statusTextEl.textContent = `Step ${stepCount}: Executing write modification in sandbox…`;
+              } else if (ev.action === 'submit') {
+                statusTextEl.textContent = `Step ${stepCount}: Submitting changeset to Wildfire policy engine…`;
+              } else {
+                statusTextEl.textContent = `Step ${stepCount}: Executing ${ev.action}…`;
+              }
+            }
+            $('chat').scrollTop = $('chat').scrollHeight;
+
+          } else if (ev.type === 'step_done') {
+            const stepDiv = $(`step-${uid}-${ev.step_idx}`);
+            if (stepDiv) {
+              const obsHtml = ev.observation !== undefined ? `<span class="obs">↳ ${esc(JSON.stringify(ev.observation).slice(0, 320))}</span>` : '';
+              const obsEl = stepDiv.querySelector('.obs');
+              if (obsEl) {
+                obsEl.outerHTML = obsHtml;
+              } else {
+                stepDiv.innerHTML += obsHtml;
+              }
+            }
+          } else if (ev.type === 'done' || ev.type === 'error') {
+            if (ev.steps && ev.steps.length) {
+              countEl.textContent = ev.steps.length;
+            }
+            if (stepCount === 0 && (!ev.steps || ev.steps.length === 0)) {
+              panelEl.style.display = 'none';
+            }
+            bubbleEl.innerHTML = esc(ev.final || '');
+            $('chat').scrollTop = $('chat').scrollHeight;
+          }
+        } catch (parseErr) {
+          console.error('SSE JSON parse error:', parseErr, jsonStr);
         }
       }
     }
-    appendAgentMsg(res.final, res.steps);
   } catch (err) {
-    loadingRow.remove();
-    console.error('[BathAgent Request Error]:', err);
-    appendAgentMsg('I encountered an error executing this request: ' + err);
+    console.error('[BathAgent Stream Error]:', err);
+    bubbleEl.innerHTML = 'I encountered an error executing this request: ' + esc(err);
   } finally {
     $('say').disabled = false;
     $('send-btn').disabled = false;

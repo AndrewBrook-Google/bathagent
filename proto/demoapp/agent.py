@@ -287,7 +287,7 @@ class ChatSession:
         )
         return obs
 
-    def run_turn(self, user_msg: str) -> Tuple[List[Dict[str, Any]], str]:
+    def run_turn_stream(self, user_msg: str):
         self.history.append(("user", user_msg))
         self.trajectory.append({"t": "user", "text": user_msg})
         steps: List[Dict[str, Any]] = []
@@ -312,18 +312,22 @@ class ChatSession:
                 tb = traceback.format_exc()
                 print(f"[BathAgent App Log] Traceback for ResourceExhaustedError:\n{tb}")
                 succinct_msg = str(e)
-                steps.append({"action": "error", "observation": succinct_msg, "traceback": tb})
+                err_step = {"action": "error", "observation": succinct_msg, "traceback": tb}
+                steps.append(err_step)
                 self.history.append(("agent", succinct_msg))
                 self.trajectory.append({"t": "agent", "text": succinct_msg})
-                return steps, succinct_msg
+                yield {"type": "error", "step": err_step, "final": succinct_msg, "steps": steps}
+                return
             except Exception as e:
                 tb = traceback.format_exc()
                 print(f"[BathAgent App Log] Traceback for LLM Error:\n{tb}")
                 succinct_msg = f"I encountered an error communicating with the reasoning backend: {e}"
-                steps.append({"action": "error", "observation": succinct_msg, "traceback": tb})
+                err_step = {"action": "error", "observation": succinct_msg, "traceback": tb}
+                steps.append(err_step)
                 self.history.append(("agent", succinct_msg))
                 self.trajectory.append({"t": "agent", "text": succinct_msg})
-                return steps, succinct_msg
+                yield {"type": "error", "step": err_step, "final": succinct_msg, "steps": steps}
+                return
 
             action = step.get("action", "done")
             args = step.get("args", {})
@@ -333,7 +337,8 @@ class ChatSession:
                 self.trajectory.append({"t": "thought", "text": thought})
 
             if action == "done":
-                steps.append({"thought": thought, "action": "done", "args": args})
+                done_step = {"thought": thought, "action": "done", "args": args}
+                steps.append(done_step)
                 final = args.get("text", "Done.")
                 if pending_cid and not any(w in final.lower() for w in ("approval", "review", "pending", "approve")):
                     final += (
@@ -342,7 +347,17 @@ class ChatSession:
                     )
                 self.history.append(("agent", final))
                 self.trajectory.append({"t": "agent", "text": final})
-                return steps, final
+                yield {"type": "done", "step": done_step, "final": final, "steps": steps}
+                return
+
+            # Yield step_start in real time so UI shows thought and action immediately
+            yield {
+                "type": "step_start",
+                "step_idx": step_idx,
+                "thought": thought,
+                "action": action,
+                "args": args,
+            }
 
             obs = self.tool(action, args, user_msg)
             if action == "submit" and isinstance(obs, dict):
@@ -359,6 +374,16 @@ class ChatSession:
             }
             steps.append(rec)
 
+            # Yield step_done in real time so UI updates with tool observation
+            yield {
+                "type": "step_done",
+                "step_idx": step_idx,
+                "thought": thought,
+                "action": action,
+                "args": args,
+                "observation": obs,
+            }
+
             obs_str = json.dumps(obs, default=str)
             if len(obs_str) > 800:
                 obs_str = obs_str[:800] + "... (truncated)"
@@ -372,4 +397,13 @@ class ChatSession:
         final = "I reached the maximum reasoning steps for this turn. Please check the Wildfire console for the latest status."
         self.history.append(("agent", final))
         self.trajectory.append({"t": "agent", "text": final})
+        yield {"type": "done", "final": final, "steps": steps}
+
+    def run_turn(self, user_msg: str) -> Tuple[List[Dict[str, Any]], str]:
+        steps = []
+        final = ""
+        for ev in self.run_turn_stream(user_msg):
+            if ev.get("type") in ("done", "error"):
+                steps = ev.get("steps", steps)
+                final = ev.get("final", final)
         return steps, final

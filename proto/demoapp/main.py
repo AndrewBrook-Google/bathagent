@@ -11,7 +11,7 @@ import urllib.request
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -51,14 +51,12 @@ class ChatReq(BaseModel):
 @app.post("/api/chat")
 def chat(req: ChatReq):
     global SESSION
-    steps, final = SESSION.run_turn(req.message)
-    return {
-        "steps": steps,
-        "final": final,
-        "agent": "bathagent",
-        "reader_id": SESSION.reader_id,
-        "notes": SESSION.notes,
-    }
+
+    def event_stream():
+        for event in SESSION.run_turn_stream(req.message):
+            yield f"data: {json.dumps(event)}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 class NewChatReq(BaseModel):
