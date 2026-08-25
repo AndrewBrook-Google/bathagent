@@ -23,7 +23,7 @@ CONSOLE = "http://127.0.0.1:8777"
 PROJECT = os.environ.get("WF_PROJECT", "andybrook-playground")
 LOCATION = os.environ.get("WF_LOCATION", "global")
 MODEL = os.environ.get("WF_MODEL", "gemini-3.7-flash")
-MAX_STEPS = 10
+MAX_STEPS = int(os.environ.get("WF_MAX_STEPS", "25"))
 
 
 class ResourceExhaustedError(Exception):
