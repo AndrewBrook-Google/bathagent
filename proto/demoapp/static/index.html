@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BathAgent — Gemini Enterprise for BathStuff</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=Google+Sans+Text:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-base: #131314;
+    --bg-surface: #1e1f20;
+    --bg-surface-hover: #282a2c;
+    --bg-surface-elevated: #242628;
+    --border-subtle: #333538;
+    --border-highlight: #444746;
+    
+    --text-primary: #e3e3e3;
+    --text-secondary: #c4c7c5;
+    --text-tertiary: #8e918f;
+    
+    --gemini-blue: #1a73e8;
+    --gemini-light-blue: #a8c7fa;
+    --gemini-purple: #a142f4;
+    --gemini-gradient: linear-gradient(135deg, #a8c7fa 0%, #d3e3fd 40%, #c58af9 100%);
+    --gemini-spark: linear-gradient(135deg, #4285f4 0%, #9b72cb 50%, #d96570 100%);
+    
+    --status-ok: #6dd58c;
+    --status-warn: #fde293;
+    --status-bad: #f28b82;
+    --status-chip: rgba(109, 213, 140, 0.12);
+    
+    --font-sans: 'Google Sans Text', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-heading: 'Google Sans', var(--font-sans);
+    --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  body {
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.6;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-subtle);
+    gap: 16px;
+    z-index: 10;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .spark-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: var(--gemini-spark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: #fff;
+    box-shadow: 0 0 16px rgba(161, 66, 244, 0.35);
+  }
+
+  .brand h1 {
+    font-family: var(--font-heading);
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    background: var(--gemini-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .brand .tag {
+    font-size: 11.5px;
+    color: var(--text-tertiary);
+    background: rgba(255, 255, 255, 0.06);
+    padding: 2px 8px;
+    border-radius: 12px;
+    border: 1px solid var(--border-subtle);
+  }
+
+  .header-metrics {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+  }
+
+  .db-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--status-chip);
+    color: var(--status-ok);
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid rgba(109, 213, 140, 0.25);
+  }
+
+  .db-badge .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--status-ok);
+    box-shadow: 0 0 8px var(--status-ok);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+
+  .header-links {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .nav-btn {
+    color: var(--gemini-light-blue);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: rgba(168, 199, 250, 0.08);
+    border: 1px solid rgba(168, 199, 250, 0.2);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .nav-btn:hover {
+    background: rgba(168, 199, 250, 0.16);
+    border-color: var(--gemini-light-blue);
+  }
+
+  /* Main Layout */
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    min-height: 0;
+    gap: 0;
+    background: var(--bg-base);
+  }
+
+  /* Chat Pane */
+  .chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    position: relative;
+    border-right: 1px solid var(--border-subtle);
+  }
+
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    scroll-behavior: smooth;
+  }
+
+  /* Welcome Card */
+  .welcome-box {
+    align-self: center;
+    max-width: 680px;
+    width: 100%;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    padding: 24px;
+    margin: 20px 0;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+
+  .welcome-box h2 {
+    font-family: var(--font-heading);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .welcome-box p {
+    color: var(--text-secondary);
+    font-size: 13.5px;
+    margin-bottom: 16px;
+  }
+
+  .chips-label {
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-tertiary);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .prompt-chips {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .chip {
+    background: var(--bg-surface-hover);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .chip:hover {
+    background: #303338;
+    border-color: var(--gemini-light-blue);
+    transform: translateY(-1px);
+  }
+
+  .chip .arrow {
+    color: var(--gemini-light-blue);
+    font-size: 14px;
+  }
+
+  /* Message Bubbles */
+  .msg-row {
+    display: flex;
+    gap: 12px;
+    max-width: 820px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .msg-row.user-row {
+    justify-content: flex-end;
+  }
+
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .avatar.agent-av {
+    background: var(--gemini-spark);
+    color: #fff;
+    box-shadow: 0 0 10px rgba(161, 66, 244, 0.25);
+  }
+
+  .avatar.user-av {
+    background: #3c4043;
+    color: #e3e3e3;
+  }
+
+  .msg-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: calc(100% - 48px);
+  }
+
+  .bubble {
+    padding: 12px 18px;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.6;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+
+  .bubble.user {
+    background: #2b2d30;
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+    border-top-right-radius: 4px;
+  }
+
+  .bubble.agent {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+    border-top-left-radius: 4px;
+  }
+
+  .bubble.system {
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    font-size: 12.5px;
+    padding: 4px 8px;
+    align-self: center;
+    text-align: center;
+  }
+
+  /* Tool steps & reasoning */
+  .reasoning-panel {
+    margin: 6px 0 10px 0;
+    background: #18191a;
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    overflow: hidden;
+    font-size: 12.5px;
+  }
+
+  .reasoning-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--bg-surface);
+    cursor: pointer;
+    user-select: none;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  .reasoning-header:hover {
+    background: var(--bg-surface-hover);
+  }
+
+  .reasoning-content {
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .step-item {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text-secondary);
+    padding: 6px 8px;
+    background: #111213;
+    border-radius: 6px;
+    border-left: 3px solid var(--gemini-light-blue);
+  }
+
+  .step-item.write-step {
+    border-left-color: var(--status-warn);
+  }
+
+  .step-item.submit-step {
+    border-left-color: var(--status-ok);
+  }
+
+  .step-item b {
+    color: var(--gemini-light-blue);
+  }
+
+  .step-item .obs {
+    color: var(--text-tertiary);
+    margin-top: 4px;
+    display: block;
+    word-break: break-all;
+  }
+
+  /* Chat Input Bar */
+  .input-area {
+    padding: 16px 32px 24px 32px;
+    background: transparent;
+    max-width: 820px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .input-capsule {
+    display: flex;
+    align-items: center;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 28px;
+    padding: 6px 8px 6px 20px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .input-capsule:focus-within {
+    border-color: var(--gemini-light-blue);
+    box-shadow: 0 4px 20px rgba(168, 199, 250, 0.18);
+  }
+
+  .input-capsule input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 14.5px;
+    padding: 8px 4px;
+  }
+
+  .input-capsule input::placeholder {
+    color: var(--text-tertiary);
+  }
+
+  .send-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: var(--gemini-blue);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.1s, background 0.2s;
+    flex-shrink: 0;
+  }
+
+  .send-btn:hover {
+    background: #1b66ca;
+    transform: scale(1.04);
+  }
+
+  .send-btn:disabled {
+    background: #333538;
+    color: #666;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Right Sidebar */
+  .sidebar {
+    background: var(--bg-surface);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    gap: 18px;
+    overflow-y: auto;
+  }
+
+  .side-card {
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .side-card h3 {
+    font-family: var(--font-heading);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .stat-tile {
+    background: var(--bg-base);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-tile .num {
+    font-family: var(--font-heading);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--gemini-light-blue);
+  }
+
+  .stat-tile .lbl {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 2px;
+  }
+
+  .safety-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+  }
+
+  .safety-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+
+  .safety-item:last-child {
+    border-bottom: none;
+  }
+
+  .badge-val {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    background: #131314;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border-subtle);
+  }
+
+  .btn-reset {
+    background: transparent;
+    color: var(--status-bad);
+    border: 1px solid rgba(242, 139, 130, 0.3);
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 12.5px;
+    font-weight: 500;
+    text-align: center;
+    transition: all 0.2s;
+  }
+
+  .btn-reset:hover {
+    background: rgba(242, 139, 130, 0.1);
+    border-color: var(--status-bad);
+  }
+
+  .btn-new-chat {
+    background: rgba(168, 199, 250, 0.08);
+    color: var(--gemini-light-blue);
+    border: 1px solid rgba(168, 199, 250, 0.25);
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 12.5px;
+    font-weight: 500;
+    text-align: center;
+    transition: all 0.2s;
+  }
+
+  .btn-new-chat:hover {
+    background: rgba(168, 199, 250, 0.16);
+  }
+
+  /* Spinner */
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(168, 199, 250, 0.3);
+    border-radius: 50%;
+    border-top-color: var(--gemini-light-blue);
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="spark-icon">✦</div>
+    <div>
+      <h1>BathAgent</h1>
+    </div>
+    <span class="tag">Gemini Enterprise</span>
+  </div>
+
+  <div class="header-metrics">
+    <div class="db-badge">
+      <div class="dot"></div>
+      AlloyDB bathstuff-prod
+    </div>
+    <span id="header-orders-count" style="color:var(--text-secondary); font-size:12.5px;">Loading metrics…</span>
+  </div>
+
+  <div class="header-links">
+    <a href="http://localhost:8779/" target="_blank" class="nav-btn">
+      <span>📊</span> Business Simulator ↗
+    </a>
+    <a href="http://localhost:8777/" target="_blank" class="nav-btn">
+      <span>🛡</span> Wildfire Console ↗
+    </a>
+  </div>
+</header>
+
+<main>
+  <!-- Chat Panel -->
+  <div class="chat-container">
+    <div id="chat">
+      <!-- Welcome Intro Box -->
+      <div class="welcome-box" id="welcome-box">
+        <h2><span>✦</span> Welcome to BathAgent</h2>
+        <p>Your enterprise AI assistant grounded in the live BathStuff AlloyDB cluster. Ask questions, look up order statuses, check catalog pricing, or request safe order modifications via Wildfire transaction safety.</p>
+        
+        <div class="chips-label">Suggested Queries</div>
+        <div class="prompt-chips">
+          <div class="chip" onclick="quickSend('How many total orders and customers are in the database, and what are the details of the latest order?')">
+            <span>📦 Show total orders, customers, and latest order details</span>
+            <span class="arrow">→</span>
+          </div>
+          <div class="chip" onclick="quickSend('What are the top 3 most expensive products currently in the catalog, including their names and prices?')">
+            <span>🏷 List top 3 most expensive products and their prices</span>
+            <span class="arrow">→</span>
+          </div>
+          <div class="chip" onclick="quickSend('Please look up order #1500: show customer ID, order date, total price, and status.')">
+            <span>🔍 Inspect details for Order #1500</span>
+            <span class="arrow">→</span>
+          </div>
+          <div class="chip" onclick="quickSend('Customer 1 requested to update order #1: adjust product 1 quantity to 3 units, recalculate line total, and submit for merge.')">
+            <span>✏️ Adjust Order #1 quantity to 3 units & submit via Wildfire</span>
+            <span class="arrow">→</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating Input Capsule -->
+    <div class="input-area">
+      <div class="input-capsule">
+        <input id="say" placeholder="Ask BathAgent about orders, catalog, prices, or adjustments…" onkeydown="if(event.key==='Enter')send()">
+        <button class="send-btn" id="send-btn" onclick="send()" title="Send Message">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Sidebar -->
+  <div class="sidebar">
+    <!-- Live Database Snapshot -->
+    <div class="side-card">
+      <h3>
+        <span>Database Snapshot</span>
+        <span style="color:var(--status-ok); font-size:10px;">● LIVE</span>
+      </h3>
+      <div class="stat-grid">
+        <div class="stat-tile">
+          <span class="num" id="stat-orders">—</span>
+          <span class="lbl">Total Orders</span>
+        </div>
+        <div class="stat-tile">
+          <span class="num" id="stat-customers">250</span>
+          <span class="lbl">Customers</span>
+        </div>
+        <div class="stat-tile">
+          <span class="num" id="stat-products">40</span>
+          <span class="lbl">Catalog Products</span>
+        </div>
+        <div class="stat-tile">
+          <span class="num" id="stat-merges">—</span>
+          <span class="lbl">Wildfire Merges</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Safety & Architecture -->
+    <div class="side-card">
+      <h3>Enterprise Safety</h3>
+      <div class="safety-info">
+        <div class="safety-item">
+          <span>Target Engine</span>
+          <span class="badge-val" style="color:var(--status-ok)">AlloyDB PostgreSQL 18</span>
+        </div>
+        <div class="safety-item">
+          <span>Reasoning Model</span>
+          <span class="badge-val" style="color:var(--gemini-light-blue)">Gemini 2.5 Flash (ADC)</span>
+        </div>
+        <div class="safety-item">
+          <span>Write Safety</span>
+          <span class="badge-val">Isolated Sandbox Branches</span>
+        </div>
+        <div class="safety-item">
+          <span>Policy Protocol</span>
+          <span class="badge-val">Wildfire Writeback Engine</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Session Actions -->
+    <div class="side-card">
+      <h3>Session Controls</h3>
+      <button class="btn-new-chat" onclick="newChat()">✦ Start Fresh Session</button>
+      <button class="btn-reset" onclick="if(confirm('Reset all demo state, changesets, and chat?'))api('/api/sim/reset',{}).then(()=>newChat())">⟳ Reset Demo World</button>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const api = (u, b) => fetch(u, {
+  method: b !== undefined ? 'POST' : 'GET',
+  headers: { 'Content-Type': 'application/json' },
+  body: b !== undefined ? JSON.stringify(b) : undefined
+}).then(r => r.json());
+
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function quickSend(text) {
+  $('say').value = text;
+  send();
+}
+
+function appendUserMsg(text) {
+  const row = document.createElement('div');
+  row.className = 'msg-row user-row';
+  row.innerHTML = `
+    <div class="msg-body">
+      <div class="bubble user">${esc(text)}</div>
+    </div>
+    <div class="avatar user-av">👤</div>
+  `;
+  $('chat').appendChild(row);
+  $('chat').scrollTop = $('chat').scrollHeight;
+}
+
+function appendAgentMsg(text, steps) {
+  const row = document.createElement('div');
+  row.className = 'msg-row';
+  
+  let stepsHtml = '';
+  if (steps && steps.length > 0) {
+    const stepItems = steps.map((s, idx) => {
+      const isWrite = s.action === 'write' || s.action === 'start_write_session';
+      const isSubmit = s.action === 'submit';
+      const cls = isWrite ? 'step-item write-step' : isSubmit ? 'step-item submit-step' : 'step-item';
+      
+      const thoughtHtml = s.thought ? `<div style="color:var(--text-secondary); margin-bottom:4px; font-style:italic;">💭 ${esc(s.thought)}</div>` : '';
+      const obsHtml = s.observation !== undefined ? `<span class="obs">↳ ${esc(JSON.stringify(s.observation).slice(0, 320))}</span>` : '';
+      return `
+        <div class="${cls}">
+          ${thoughtHtml}
+          <b>${esc(s.action)}</b>(${esc(JSON.stringify(s.args || {}))})
+          ${obsHtml}
+        </div>
+      `;
+    }).join('');
+
+    stepsHtml = `
+      <div class="reasoning-panel">
+        <div class="reasoning-header" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display==='none'?'flex':'none'">
+          <span>⚡ ${steps.length} Grounded Reasoning & Tool Steps</span>
+          <span style="font-size:11px; opacity:0.8;">▼ details</span>
+        </div>
+        <div class="reasoning-content" style="display:none;">
+          ${stepItems}
+        </div>
+      </div>
+    `;
+  }
+
+  row.innerHTML = `
+    <div class="avatar agent-av">✦</div>
+    <div class="msg-body">
+      ${stepsHtml}
+      <div class="bubble agent">${esc(text)}</div>
+    </div>
+  `;
+  $('chat').appendChild(row);
+  $('chat').scrollTop = $('chat').scrollHeight;
+}
+
+function appendSystemMsg(text) {
+  const row = document.createElement('div');
+  row.className = 'bubble system';
+  row.innerHTML = `<span>${text}</span>`;
+  $('chat').appendChild(row);
+  $('chat').scrollTop = $('chat').scrollHeight;
+}
+
+async function send() {
+  const text = $('say').value.trim();
+  if (!text) return;
+  
+  $('say').value = '';
+  $('say').disabled = true;
+  $('send-btn').disabled = true;
+  
+  appendUserMsg(text);
+  
+  const spinnerId = 'spin-' + Date.now();
+  const loadingRow = document.createElement('div');
+  loadingRow.className = 'msg-row';
+  loadingRow.id = spinnerId;
+  loadingRow.innerHTML = `
+    <div class="avatar agent-av">✦</div>
+    <div class="msg-body">
+      <div class="bubble agent" style="display:flex; align-items:center; gap:8px; color:var(--text-secondary);">
+        <div class="spinner"></div>
+        <span>Querying AlloyDB bathstuff-prod & reasoning…</span>
+      </div>
+    </div>
+  `;
+  $('chat').appendChild(loadingRow);
+  $('chat').scrollTop = $('chat').scrollHeight;
+
+  try {
+    const res = await api('/api/chat', { message: text });
+    loadingRow.remove();
+    if (res && res.steps) {
+      for (const s of res.steps) {
+        if (s.traceback) {
+          console.error('[BathAgent Backend Traceback]:\n' + s.traceback);
+        }
+      }
+    }
+    appendAgentMsg(res.final, res.steps);
+  } catch (err) {
+    loadingRow.remove();
+    console.error('[BathAgent Request Error]:', err);
+    appendAgentMsg('I encountered an error executing this request: ' + err);
+  } finally {
+    $('say').disabled = false;
+    $('send-btn').disabled = false;
+    $('say').focus();
+    updateStats();
+  }
+}
+
+async function newChat() {
+  await api('/api/chat/new', {});
+  $('chat').innerHTML = '';
+  
+  // Re-append welcome box
+  const welcome = document.createElement('div');
+  welcome.className = 'welcome-box';
+  welcome.innerHTML = `
+    <h2><span>✦</span> Welcome to BathAgent</h2>
+    <p>Fresh session initialized. All inquiries and mutations run against live <b>bathstuff-prod</b> AlloyDB tables with zero hallucination.</p>
+    <div class="chips-label">Suggested Queries</div>
+    <div class="prompt-chips">
+      <div class="chip" onclick="quickSend('How many total orders and customers are in the database, and what are the details of the latest order?')">
+        <span>📦 Show total orders, customers, and latest order details</span>
+        <span class="arrow">→</span>
+      </div>
+      <div class="chip" onclick="quickSend('What are the top 3 most expensive products currently in the catalog, including their names and prices?')">
+        <span>🏷 List top 3 most expensive products and their prices</span>
+        <span class="arrow">→</span>
+      </div>
+      <div class="chip" onclick="quickSend('Please look up order #1500: show customer ID, order date, total price, and status.')">
+        <span>🔍 Inspect details for Order #1500</span>
+        <span class="arrow">→</span>
+      </div>
+      <div class="chip" onclick="quickSend('Customer 1 requested to update order #1: adjust product 1 quantity to 3 units, recalculate line total, and submit for merge.')">
+        <span>✏️ Adjust Order #1 quantity to 3 units & submit via Wildfire</span>
+        <span class="arrow">→</span>
+      </div>
+    </div>
+  `;
+  $('chat').appendChild(welcome);
+  $('say').focus();
+  updateStats();
+}
+
+async function updateStats() {
+  try {
+    const s = await api('/api/sim/state');
+    if (s && s.primary) {
+      const orders = s.primary.orders || 0;
+      const products = s.primary.products || 0;
+      const merges = s.primary.merged_actions || 0;
+      
+      $('stat-orders').textContent = Number(orders).toLocaleString();
+      $('stat-products').textContent = Number(products).toLocaleString();
+      $('stat-merges').textContent = Number(merges).toLocaleString();
+      $('header-orders-count').innerHTML = `<b>${Number(orders).toLocaleString()}</b> live orders · <b>${products}</b> products · <b>250</b> customers`;
+    }
+  } catch(e) {}
+}
+
+async function pollFollowUps() {
+  try {
+    const r = await api('/api/chat/follow_ups');
+    if (r && r.messages) {
+      for (const m of r.messages) {
+        appendSystemMsg('↦ Human review decided in Wildfire console');
+        appendAgentMsg(m);
+      }
+      if (r.messages.length) updateStats();
+    }
+  } catch(e) {}
+}
+
+updateStats();
+setInterval(updateStats, 4000);
+setInterval(pollFollowUps, 3000);
+</script>
+</body>
+</html>

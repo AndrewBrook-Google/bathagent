@@ -17,7 +17,9 @@ except ImportError:
 class Settings:
     # LLM Settings
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.7-flash")
+    GEMINI_LOCATION: str = os.getenv("GEMINI_LOCATION", "global")
+
 
     # AlloyDB / PostgreSQL Settings
     DB_HOST: str = os.getenv("DB_HOST", "10.128.0.2")

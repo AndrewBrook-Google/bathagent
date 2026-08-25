@@ -1,0 +1,348 @@
+[
+  {
+    "case": "X1_pure_dml",
+    "mode": "M1_segmented",
+    "outcome": "applied",
+    "applied_rows": 200,
+    "lock_window_ms": 38.6,
+    "detail": "",
+    "expected": "applied",
+    "as_expected": true,
+    "divergent_rows": 0,
+    "schema_ok": true,
+    "capture": {
+      "segments": [
+        "dml"
+      ],
+      "statements": 2,
+      "net_diff_rows": 200,
+      "ops": {
+        "U": 200
+      },
+      "ddl": false,
+      "diff_bytes": 89076
+    }
+  },
+  {
+    "case": "X1_pure_dml",
+    "mode": "M2_exec_verify",
+    "outcome": "applied",
+    "applied_rows": 200,
+    "lock_window_ms": 35.2,
+    "detail": "",
+    "expected": "applied",
+    "as_expected": true,
+    "divergent_rows": 0,
+    "schema_ok": true,
+    "capture": {
+      "segments": [
+        "dml"
+      ],
+      "statements": 2,
+      "net_diff_rows": 200,
+      "ops": {
+        "U": 200
+      },
+      "ddl": false,
+      "diff_bytes": 89076
+    }
+  },
+  {
+    "case": "X2_add_column_backfill",
+    "mode": "M1_segmented",
+    "outcome": "applied",
+    "applied_rows": 200,
+    "lock_window_ms": 50.2,
+    "detail": "",
+    "expected": "applied",
+    "as_expected": true,
+    "divergent_rows": 0,
+    "schema_ok": true,
+    "capture": {
+      "segments": [
+        "ddl",
+        "dml"
+      ],
+      "statements": 2,
+      "net_diff_rows": 200,
+      "ops": {
+        "U": 200
+      },
+      "ddl": true,
+      "diff_bytes": 99076
+    }
+  },
+  {
+    "case": "X2_add_column_backfill",
+    "mode": "M2_exec_verify",
+    "outcome": "applied",
+    "applied_rows": 200,
+    "lock_window_ms": 40.0,
+    "detail": "",
+    "expected": "applied",
+    "as_expected": true,
+    "divergent_rows": 0,
+    "schema_ok": true,
+    "capture": {
+      "segments": [
+        "ddl",
+        "dml"
+      ],
+      "statements": 2,
+      "net_diff_rows": 200,
+      "ops": {
+        "U": 200
+      },
+      "ddl": true,
+      "diff_bytes": 99076
+    }
+  },
+  {
+    "case": "X3_backfill_then_not_null",
+    "mode": "M1_segmented",
+    "outcome": "applied",
+    "applied_rows": 500,
+    "lock_window_ms": 84.4,
+    "detail": "",
+    "expected": "applied",
+    "as_expected": true,
+    "divergent_rows": 0,
+    "schema_ok": true,
+    "capture": {
+      "segments": [
+        "dml",
+        "ddl"
+      ],
+      "statements": 2,
+      "net_diff_rows": 500,
+      "ops": {
+        "U": 500
+      },
+      "ddl": true,
+      "diff_bytes": 224476
+    }
+  },
+  {
+    "case": "X3_backfill_then_not_null",
+    "mode": "M2_exec_verify",
+    "outcome": "applied",
+    "applied_rows": 500,
+    "lock_window_ms": 47.7,
+    "detail": "",
+    "expected": "applied",
+    "as_expected": true,
+    "divergent_rows": 0,
+    "schema_ok": true,
+    "capture": {
+      "segments": [
+        "dml",
+        "ddl"
+      ],
+      "statements": 2,
+      "net_diff_rows": 500,
+      "ops": {
+        "U": 500
+      },
+      "ddl": true,
+      "diff_bytes": 224476
+    }
+  },
+  {
+    "case": "X4_create_table_insert",
+    "mode": "M1_segmented",
+    "outcome": "applied",
+    "applied_rows": 400,
+    "lock_window_ms": 74.2,
+    "detail": "",
+    "expected": "applied",
+    "as_expected": true,
+    "divergent_rows": 0,
+    "schema_ok": true,
+    "capture": {
+      "segments": [
+        "ddl",
+        "dml"
+      ],
+      "statements": 3,
+      "net_diff_rows": 400,
+      "ops": {
+        "I": 200,
+        "U": 200
+      },
+      "ddl": true,
+      "diff_bytes": 123552
+    }
+  },
+  {
+    "case": "X4_create_table_insert",
+    "mode": "M2_exec_verify",
+    "outcome": "applied",
+    "applied_rows": 400,
+    "lock_window_ms": 48.4,
+    "detail": "",
+    "expected": "applied",
+    "as_expected": true,
+    "divergent_rows": 0,
+    "schema_ok": true,
+    "capture": {
+      "segments": [
+        "ddl",
+        "dml"
+      ],
+      "statements": 3,
+      "net_diff_rows": 400,
+      "ops": {
+        "I": 200,
+        "U": 200
+      },
+      "ddl": true,
+      "diff_bytes": 123552
+    }
+  },
+  {
+    "case": "X5_data_drift",
+    "mode": "M1_segmented",
+    "outcome": "data_conflict",
+    "applied_rows": 0,
+    "lock_window_ms": 43.4,
+    "detail": "1 drifted row(s) in orders",
+    "expected": "data_conflict",
+    "as_expected": true,
+    "divergent_rows": null,
+    "schema_ok": null,
+    "capture": {
+      "segments": [
+        "ddl",
+        "dml"
+      ],
+      "statements": 2,
+      "net_diff_rows": 200,
+      "ops": {
+        "U": 200
+      },
+      "ddl": true,
+      "diff_bytes": 99076
+    }
+  },
+  {
+    "case": "X5_data_drift",
+    "mode": "M2_exec_verify",
+    "outcome": "verify_mismatch",
+    "applied_rows": 0,
+    "lock_window_ms": 35.7,
+    "detail": "1 approved-only / 1 replay-only rows; e.g. ('orders', '{\"id\": 42}', 'U')",
+    "expected": "verify_mismatch",
+    "as_expected": true,
+    "divergent_rows": null,
+    "schema_ok": null,
+    "capture": {
+      "segments": [
+        "ddl",
+        "dml"
+      ],
+      "statements": 2,
+      "net_diff_rows": 200,
+      "ops": {
+        "U": 200
+      },
+      "ddl": true,
+      "diff_bytes": 99076
+    }
+  },
+  {
+    "case": "X6_schema_drift",
+    "mode": "M1_segmented",
+    "outcome": "schema_drift",
+    "applied_rows": 0,
+    "lock_window_ms": 8.2,
+    "detail": "fingerprint mismatch at basis",
+    "expected": "schema_drift",
+    "as_expected": true,
+    "divergent_rows": null,
+    "schema_ok": null,
+    "capture": {
+      "segments": [
+        "dml"
+      ],
+      "statements": 1,
+      "net_diff_rows": 200,
+      "ops": {
+        "U": 200
+      },
+      "ddl": false,
+      "diff_bytes": 89076
+    }
+  },
+  {
+    "case": "X6_schema_drift",
+    "mode": "M2_exec_verify",
+    "outcome": "schema_drift",
+    "applied_rows": 0,
+    "lock_window_ms": 8.0,
+    "detail": "fingerprint mismatch at basis",
+    "expected": "schema_drift",
+    "as_expected": true,
+    "divergent_rows": null,
+    "schema_ok": null,
+    "capture": {
+      "segments": [
+        "dml"
+      ],
+      "statements": 1,
+      "net_diff_rows": 200,
+      "ops": {
+        "U": 200
+      },
+      "ddl": false,
+      "diff_bytes": 89076
+    }
+  },
+  {
+    "case": "X7_nondeterministic_sql",
+    "mode": "M1_segmented",
+    "outcome": "applied",
+    "applied_rows": 200,
+    "lock_window_ms": 42.2,
+    "detail": "",
+    "expected": "applied",
+    "as_expected": true,
+    "divergent_rows": 0,
+    "schema_ok": true,
+    "capture": {
+      "segments": [
+        "dml"
+      ],
+      "statements": 1,
+      "net_diff_rows": 200,
+      "ops": {
+        "U": 200
+      },
+      "ddl": false,
+      "diff_bytes": 93276
+    }
+  },
+  {
+    "case": "X7_nondeterministic_sql",
+    "mode": "M2_exec_verify",
+    "outcome": "verify_mismatch",
+    "applied_rows": 0,
+    "lock_window_ms": 31.2,
+    "detail": "200 approved-only / 200 replay-only rows; e.g. ('orders', '{\"id\": 20}', 'U')",
+    "expected": "verify_mismatch",
+    "as_expected": true,
+    "divergent_rows": null,
+    "schema_ok": null,
+    "capture": {
+      "segments": [
+        "dml"
+      ],
+      "statements": 1,
+      "net_diff_rows": 200,
+      "ops": {
+        "U": 200
+      },
+      "ddl": false,
+      "diff_bytes": 93276
+    }
+  }
+]

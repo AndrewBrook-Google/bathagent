@@ -1,0 +1,152 @@
+[
+  {
+    "case": "C1_baseline_no_drift",
+    "option": "option1",
+    "outcome": "applied",
+    "applied_rows": 600,
+    "conflicts": 0,
+    "lock_window_ms": 1509.8,
+    "detail": "",
+    "capture": {
+      "statements": 3,
+      "diff_rows": 200,
+      "ops": {
+        "U": 200
+      },
+      "diff_bytes": 107076
+    },
+    "validator": {
+      "rowcount<=5000": true,
+      "sum(total) unchanged": true,
+      "touched \u2286 read-scope": true
+    },
+    "divergent_rows": 0,
+    "drift_survived": null,
+    "undo_ok": null
+  },
+  {
+    "case": "C1_baseline_no_drift",
+    "option": "option2",
+    "outcome": "applied",
+    "applied_rows": 200,
+    "conflicts": 0,
+    "lock_window_ms": 37.9,
+    "detail": "",
+    "capture": {
+      "statements": 3,
+      "diff_rows": 200,
+      "ops": {
+        "U": 200
+      },
+      "diff_bytes": 107076
+    },
+    "validator": {
+      "rowcount<=5000": true,
+      "sum(total) unchanged": true,
+      "touched \u2286 read-scope": true
+    },
+    "divergent_rows": 0,
+    "drift_survived": null,
+    "undo_ok": true
+  },
+  {
+    "case": "C2_drift_same_column",
+    "option": "option1",
+    "outcome": "applied",
+    "applied_rows": 600,
+    "conflicts": 0,
+    "lock_window_ms": 1508.4,
+    "detail": "",
+    "capture": {
+      "statements": 3,
+      "diff_rows": 200,
+      "ops": {
+        "U": 200
+      },
+      "diff_bytes": 107076
+    },
+    "validator": {
+      "rowcount<=5000": true,
+      "sum(total) unchanged": true,
+      "touched \u2286 read-scope": true
+    },
+    "divergent_rows": 1,
+    "drift_survived": false,
+    "undo_ok": null
+  },
+  {
+    "case": "C2_drift_same_column",
+    "option": "option2",
+    "outcome": "conflict_abort",
+    "applied_rows": 0,
+    "conflicts": 1,
+    "lock_window_ms": 51.5,
+    "detail": "1 row(s) drifted since capture",
+    "capture": {
+      "statements": 3,
+      "diff_rows": 200,
+      "ops": {
+        "U": 200
+      },
+      "diff_bytes": 107076
+    },
+    "validator": {
+      "rowcount<=5000": true,
+      "sum(total) unchanged": true,
+      "touched \u2286 read-scope": true
+    },
+    "divergent_rows": 200,
+    "drift_survived": true,
+    "undo_ok": null
+  },
+  {
+    "case": "C3_nondeterministic_sql",
+    "option": "option1",
+    "outcome": "applied",
+    "applied_rows": 200,
+    "conflicts": 0,
+    "lock_window_ms": 1504.0,
+    "detail": "",
+    "capture": {
+      "statements": 1,
+      "diff_rows": 200,
+      "ops": {
+        "U": 200
+      },
+      "diff_bytes": 98076
+    },
+    "validator": {
+      "rowcount<=5000": true,
+      "sum(total) unchanged": true,
+      "touched \u2286 read-scope": true
+    },
+    "divergent_rows": 200,
+    "drift_survived": null,
+    "undo_ok": null
+  },
+  {
+    "case": "C3_nondeterministic_sql",
+    "option": "option2",
+    "outcome": "applied",
+    "applied_rows": 200,
+    "conflicts": 0,
+    "lock_window_ms": 45.9,
+    "detail": "",
+    "capture": {
+      "statements": 1,
+      "diff_rows": 200,
+      "ops": {
+        "U": 200
+      },
+      "diff_bytes": 98076
+    },
+    "validator": {
+      "rowcount<=5000": true,
+      "sum(total) unchanged": true,
+      "touched \u2286 read-scope": true
+    },
+    "divergent_rows": 0,
+    "drift_survived": null,
+    "undo_ok": true
+  }
+]

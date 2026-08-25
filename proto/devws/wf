@@ -1,0 +1,238 @@
+#!/usr/bin/env python3
+"""wf — Wildfire CLI for external agents (the future MCP tool surface).
+
+Session state lives in ./.wf/session.json (reader id, last changeset, and a
+trajectory of every command — shipped as review evidence on propose).
+
+  wf checkout --actor NAME --role ROLE [--name N]     self-provision a reader
+  wf attach READER_ID          bind to a reader provisioned in the console
+  wf sql "SELECT ..."          run SQL on the reader (writes need detach first)
+  wf detach                    freeze basis, enable local writes (Wildfire session)
+  wf propose --task "..."      submit changes for review; prints changeset id
+  wf merge [CHANGESET]         apply an approved changeset (runs as YOUR identity)
+  wf status [CHANGESET]        one-shot status (default: last proposed)
+  wf wait [CHANGESET]          block until merged/rejected/merge_failed
+  wf resync                    discard local work, refresh from primary
+  wf state                     cluster summary (primary stats, readers, queue)
+"""
+import argparse
+import json
+import os
+import pathlib
+import sys
+import time
+import urllib.request
+
+CONSOLE = os.environ.get("WF_CONSOLE", "http://localhost:8777")
+WFDIR = pathlib.Path(".wf")
+SESSION = WFDIR / "session.json"
+
+
+def api(path, body=None, method=None):
+    req = urllib.request.Request(CONSOLE + path,
+        data=json.dumps(body).encode() if body is not None else None,
+        headers={"Content-Type": "application/json"},
+        method=method or ("POST" if body is not None else "GET"))
+    return json.load(urllib.request.urlopen(req, timeout=120))
+
+
+def load():
+    if not SESSION.exists():
+        sys.exit("no active session — run: wf attach <reader_id>, or "
+                 "wf checkout --actor ... --role ...")
+    return json.loads(SESSION.read_text())
+
+
+def save(s):
+    WFDIR.mkdir(exist_ok=True)
+    SESSION.write_text(json.dumps(s, indent=1))
+
+
+def out(obj):
+    print(json.dumps(obj, indent=1, default=str))
+
+
+def cmd_checkout(a):
+    """Self-provision a replica. A replica is bound to an identity and a role;
+    the task is stated per changeset, at propose time."""
+    r = api("/api/branches", {"actor": a.actor, "role": a.role, "name": a.name})
+    if "error" in r:
+        sys.exit(f"error: {r['error']}")
+    save({"reader_id": r["reader_id"], "actor": a.actor, "role": a.role,
+          "last_changeset": None,
+          "trajectory": [{"t": "tool", "name": "checkout", "args": {"role": a.role},
+                          "obs": f"self-provisioned reader {r['reader_id']}"}]})
+    print(f"reader {r['reader_id']} ATTACHED (read-only, basis {r['basis_fp'][:12]})")
+    print("next: explore with `wf sql`, then `wf detach` before any write")
+
+
+def cmd_attach(a):
+    """Bind to a reader that was provisioned in the console (by id)."""
+    st = api("/api/state")
+    br = next((b for b in st["branches"] if b["id"] == a.reader_id), None)
+    if not br:
+        sys.exit(f"error: reader {a.reader_id} not found — create it in the "
+                 f"console (Agents page) or check `wf state`")
+    if br["status"] not in ("attached", "sandbox"):
+        sys.exit(f"error: reader {a.reader_id} is {br['status']} — not usable")
+    save({"reader_id": br["id"], "actor": br["actor"], "role": br["role"],
+          "last_changeset": None,
+          "trajectory": [{"t": "tool", "name": "attach_existing", "args": {},
+                          "obs": f"bound to console-provisioned reader {br['id']} "
+                                 f"(for {br['actor']}, role {br['role']})"}]})
+    print(f"bound to reader {br['id']} ({br['status']}) — provisioned for "
+          f"{br['actor']}, role {br['role']}")
+    if br["status"] == "attached":
+        print("reader is read-only — run `wf detach` before any write")
+
+
+def cmd_sql(a):
+    s = load()
+    r = api(f"/api/branches/{s['reader_id']}/exec", {"sql": a.sql})
+    kind = "query" if a.sql.strip().upper().startswith("SELECT") else "write"
+    s["trajectory"].append({"t": "tool", "name": kind, "args": {"sql": a.sql},
+                            "obs": json.dumps(r, default=str)[:220]})
+    save(s)
+    if "error" in r:
+        sys.exit(f"error: {r['error']}")
+    out(r.get("rows", r))
+
+
+def cmd_detach(a):
+    s = load()
+    r = api(f"/api/branches/{s['reader_id']}/detach", {})
+    if "error" in r:
+        sys.exit(f"error: {r['error']}")
+    s["trajectory"].append({"t": "tool", "name": "start_write_session",
+                            "args": {}, "obs": f"basis {r['basis_fp'][:12]}"})
+    save(s)
+    print(f"reader {s['reader_id']} DETACHED @ basis {r['basis_fp'][:12]} — writes enabled")
+
+
+def cmd_propose(a):
+    s = load()
+    s["task"] = a.task
+    s["trajectory"].insert(0, {"t": "user", "text": a.task})
+    if a.note:
+        s["trajectory"].append({"t": "agent", "text": a.note})
+    r = api(f"/api/branches/{s['reader_id']}/propose",
+            {"task": a.task, "trajectory": s["trajectory"][-80:]})
+    if "error" in r:
+        sys.exit(f"error: {r['error']}")
+    s["last_changeset"] = r.get("changeset_id")
+    s["trajectory"].append({"t": "tool", "name": "submit", "args": {},
+                            "obs": json.dumps(r, default=str)[:220]})
+    save(s)
+    out(r)
+    if r.get("status") == "pending_human":
+        print("\nawaiting human review in the console — run `wf wait` to block until decided")
+
+
+def _status(cid):
+    c = api("/api/changesets/" + cid)
+    return c.get("status"), c
+
+
+def cmd_status(a):
+    s = load()
+    cid = a.changeset or s.get("last_changeset") or sys.exit("no changeset")
+    status, c = _status(cid)
+    out({"changeset": cid, "status": status,
+         "merge_result": c.get("merge_result"), "review": c.get("review")})
+
+
+def _merge_now(s, cid):
+    """Approval is a decision, not an execution: the apply runs under the
+    MERGE CALLER's credentials. We are the caller — merge as ourselves."""
+    print(f"approved — submitting merge request as '{s['actor']}' …", flush=True)
+    r = api(f"/api/changesets/{cid}/merge", {"merger": s["actor"]})
+    s["trajectory"].append({"t": "tool", "name": "merge", "args": {},
+                            "obs": json.dumps(r, default=str)[:220]})
+    save(s)
+    return r
+
+
+def cmd_merge(a):
+    s = load()
+    cid = a.changeset or s.get("last_changeset") or sys.exit("no changeset")
+    r = _merge_now(s, cid)
+    out(r)
+    sys.exit(0 if r.get("status") == "merged" else 2)
+
+
+def cmd_wait(a):
+    s = load()
+    cid = a.changeset or s.get("last_changeset") or sys.exit("no changeset")
+    deadline = time.time() + a.timeout
+    print(f"waiting on changeset {cid[:8]} …", flush=True)
+    while time.time() < deadline:
+        status, c = _status(cid)
+        if status == "approved":
+            r = _merge_now(s, cid)
+            if r.get("status") == "approved":     # permission_denied: our DB
+                sys.exit("approved, but merge was refused by the primary for "
+                         f"our identity: {r.get('merge', {}).get('detail')} — "
+                         "someone with sufficient DB privileges must run the merge")
+            continue                              # loop re-reads final status
+        if status in ("merged", "rejected", "merge_failed", "reverted"):
+            mr = c.get("merge_result")
+            print(f"DECIDED: {status}" + (f" — {mr}" if mr else ""))
+            return sys.exit(0 if status == "merged" else 2)
+        time.sleep(3)
+    sys.exit("timeout — still undecided")
+
+
+def cmd_resync(a):
+    s = load()
+    r = api(f"/api/branches/{s['reader_id']}/resync", {})
+    if "error" in r:
+        # reader was released (merged -> scale-to-zero): attach a fresh one
+        r = api("/api/branches", {"actor": s["actor"], "role": s["role"]})
+        if "error" in r:
+            sys.exit(f"error: {r['error']}")
+        s["reader_id"] = r["reader_id"]
+        s["trajectory"].append({"t": "tool", "name": "reattach", "args": {},
+                                "obs": f"new reader {r['reader_id']} @ {r['basis_fp'][:12]}"})
+        save(s)
+        print(f"previous reader was released; new reader {r['reader_id']} "
+              f"ATTACHED @ basis {r['basis_fp'][:12]} (read-only)")
+        return
+    s["trajectory"].append({"t": "tool", "name": "resync", "args": {},
+                            "obs": f"basis {r['basis_fp'][:12]}"})
+    save(s)
+    print(f"reader {s['reader_id']} re-synced @ basis {r['basis_fp'][:12]} (local work discarded)")
+
+
+def cmd_state(a):
+    st = api("/api/state")
+    out({"primary": st["primary"],
+         "readers": [{k: b[k] for k in ("id", "status", "actor", "role")}
+                     for b in st["branches"][:8]],
+         "recent_changesets": [{k: c[k] for k in ("id", "status", "actor")}
+                               for c in st["changesets"][:8]]})
+
+
+p = argparse.ArgumentParser(prog="wf", description=__doc__,
+                            formatter_class=argparse.RawDescriptionHelpFormatter)
+sub = p.add_subparsers(dest="cmd", required=True)
+c = sub.add_parser("checkout"); c.add_argument("--actor", required=True)
+c.add_argument("--role", required=True); c.add_argument("--name", default="")
+c.set_defaults(f=cmd_checkout)
+c = sub.add_parser("attach"); c.add_argument("reader_id")
+c.set_defaults(f=cmd_attach)
+c = sub.add_parser("sql"); c.add_argument("sql"); c.set_defaults(f=cmd_sql)
+c = sub.add_parser("detach"); c.set_defaults(f=cmd_detach)
+c = sub.add_parser("propose"); c.add_argument("--task", required=True,
+    help="one line: what this changeset is for (review evidence)")
+c.add_argument("--note", default="", help="optional: how you did it / caveats")
+c.set_defaults(f=cmd_propose)
+c = sub.add_parser("status"); c.add_argument("changeset", nargs="?")
+c.set_defaults(f=cmd_status)
+c = sub.add_parser("merge"); c.add_argument("changeset", nargs="?")
+c.set_defaults(f=cmd_merge)
+c = sub.add_parser("wait"); c.add_argument("changeset", nargs="?")
+c.add_argument("--timeout", type=int, default=1800); c.set_defaults(f=cmd_wait)
+c = sub.add_parser("resync"); c.set_defaults(f=cmd_resync)
+c = sub.add_parser("state"); c.set_defaults(f=cmd_state)
+a = p.parse_args()
+a.f(a)

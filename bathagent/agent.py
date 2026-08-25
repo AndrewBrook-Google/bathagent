@@ -1,15 +1,22 @@
 """BathAgent - Google ADK Agent Implementation.
 Coordinates conversational queries with MCP Toolbox for Databases (safe reads/canned writes)
 and Wildfire Proxy (for complex, validated, and isolated SQL mutations).
+Features exponential backoff on 429 rate limits, grounded tool execution, and clean error formatting.
 """
 
 import json
+import logging
 import os
+import random
+import time
+import traceback
 from typing import Any, Dict, List, Optional
 
 from bathagent.config import settings
 from bathagent.tools.toolbox_client import ToolboxClient
 from bathagent.tools.wildfire_client import WildfireClient
+
+logger = logging.getLogger("bathagent")
 
 # Import Google GenAI SDK
 try:
@@ -20,36 +27,41 @@ except ImportError:
     GENAI_AVAILABLE = False
 
 
+class ResourceExhaustedError(Exception):
+    """Raised when Gemini returns 429 after 5 retry attempts."""
+    pass
+
+
 SYSTEM_INSTRUCTION = """
 You are BathAgent, the trusted AI assistant for BathStuff (the world's 5th largest health and beauty online retailer).
 You serve BathStuff Customer Support representatives and FinOps Operations Analysts.
+You operate on an AlloyDB PostgreSQL database (`bathstuff-prod`) via MCP Toolbox for Databases and Wildfire transaction safety.
 
-Your role is to assist with:
-1. Customer order inquiries, order lookups, and order status checks.
-2. Standard order actions (cancelling unshipped orders, creating replacement orders).
-3. Read-only database exploration and business reporting using SQL.
-4. Safe data remediations and compliance adjustments (e.g. retroactive tariff recalculations).
+STRICT GROUNDING & ZERO-HALLUCINATION POLICY:
+1. You are strictly grounded in the database. You MUST ONLY state facts retrieved directly from the database tools.
+2. NEVER guess, fabricate, hallucinate, or extrapolate customer details, order IDs, product names, SKUs, prices, or statuses.
+3. Every fact, number, and status in your final answer MUST be supported by a tool observation in this turn.
+4. If a customer for a new order does not exist in the database, use `ensure_customer_exists` to create them before placing or modifying the order.
 
-CRITICAL ARCHITECTURE & SAFETY RULES:
-- MCP TOOLBOX FOR DATABASES:
-  * For order lookups, order details, cancellations, and read-only analytical queries, use the provided Toolbox tools:
+TOOL ROLES:
+- MCP TOOLBOX:
+  * For order lookups, order details, customer creation, cancellations, and read-only analytical queries:
     - `lookup_customer_orders(customer_id)`
     - `get_order_details(order_id)`
+    - `ensure_customer_exists(customer_id, full_name, email, shipping_country)`
     - `cancel_unshipped_order(order_id, reason)`
     - `create_customer_order(customer_id, items)`
     - `execute_sql_read_only(query)`
   * Note: `execute_sql_read_only` strictly rejects mutating statements (INSERT, UPDATE, DELETE, ALTER, DROP, etc.).
 
 - WILDFIRE PROXY FOR MUTATIONS:
-  * You do NOT have direct write access to perform bulk or ad-hoc data modifications on the production database.
-  * For ANY complex data mutation, bulk update, retroactive tax/tariff adjustment, or schema modification, you MUST formulate the precise SQL statement and submit it through Wildfire using `propose_sql_mutation(sql_statement, description, validation="sandbox")`.
-  * Wildfire will validate the change in an isolated sandbox clone, evaluate row-level diffs, verify compliance policies (e.g., ensuring net customer invoice total remains invariant when adding offsetting tariff + credit items), and park the changeset for human FinOps approval.
-  * Always inform the user of the generated Changeset ID and provide the link to the Wildfire Review Console.
+  * For ANY complex data mutation, bulk update, retroactive tax/tariff adjustment, or schema modification, submit it through Wildfire using `propose_sql_mutation(sql_statement, description, validation="sandbox")`.
+  * Wildfire validates the change in an isolated sandbox clone, evaluates row-level diffs, verifies compliance policies, and parks the changeset for human approval if needed.
+  * Always inform the user of the generated Changeset ID and status.
 
 STYLE:
 - Be clear, professional, concise, and transparent about which tools you invoke.
 - When summarizing database results, use clean markdown tables.
-- When proposing changes via Wildfire, clearly present the SQL and the business rationale.
 """
 
 
@@ -61,7 +73,7 @@ class BathAgent:
         self.wildfire = WildfireClient()
         self.history: List[Dict[str, Any]] = []
         
-        # Initialize Gemini Client (supports API Key or Vertex AI Application Default Credentials)
+        # Initialize Gemini Client
         self.client = None
         if GENAI_AVAILABLE:
             api_key = settings.GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")
@@ -69,11 +81,11 @@ class BathAgent:
                 self.client = genai.Client(api_key=api_key)
             else:
                 project = os.getenv("GOOGLE_CLOUD_PROJECT", os.getenv("GCP_PROJECT", "andybrook-playground"))
-                location = os.getenv("GOOGLE_CLOUD_REGION", os.getenv("GCP_REGION", "us-central1"))
+                location = os.getenv("GEMINI_LOCATION", os.getenv("GOOGLE_CLOUD_REGION", "global"))
                 try:
                     self.client = genai.Client(vertexai=True, project=project, location=location)
                 except Exception as e:
-                    print(f"Vertex AI initialization notice: {e}")
+                    logger.warning("Vertex AI initialization notice: %s", e)
 
     # -------------------------------------------------------------------------
     # Tool Bindings
@@ -85,6 +97,21 @@ class BathAgent:
     def get_order_details(self, order_id: int) -> Dict[str, Any]:
         """Retrieve comprehensive line item details for a specific order."""
         return self.toolbox.get_order_details(order_id=order_id)
+
+    def ensure_customer_exists(
+        self, customer_id: int, full_name: str, email: str, shipping_country: str = "US"
+    ) -> Dict[str, Any]:
+        """Ensures a customer record exists in the customers table, creating it if absent."""
+        sql = (
+            f"INSERT INTO customers (customer_id, full_name, email, shipping_country) "
+            f"VALUES ({customer_id}, '{full_name}', '{email}', '{shipping_country}') "
+            f"ON CONFLICT (customer_id) DO NOTHING;"
+        )
+        return self.wildfire.propose_sql(
+            sql_statement=sql,
+            description=f"Auto-create customer #{customer_id} ({full_name})",
+            validation="sandbox",
+        )
 
     def create_customer_order(self, customer_id: int, items: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Create a new customer order with line items in PENDING status."""
@@ -120,21 +147,20 @@ class BathAgent:
         return self.wildfire.list_changesets(status=status if status else None)
 
     # -------------------------------------------------------------------------
-    # Execution & Conversational Turn
+    # Execution & Conversational Turn with Exponential Backoff
     # -------------------------------------------------------------------------
     def run_prompt(self, user_prompt: str) -> Dict[str, Any]:
-        """Runs a user prompt through the agent, invoking tools and returning the response."""
-        # Check if Gemini API client is configured
-        if self.client:
-            return self._run_gemini(user_prompt)
-        else:
-            return self._run_heuristic(user_prompt)
+        """Runs a user prompt through the agent with 429 exponential backoff up to 5 attempts."""
+        if not self.client:
+            return {
+                "text": "Gemini client is not initialized. Please ensure credentials or GEMINI_API_KEY are configured.",
+                "tool_calls": [],
+            }
 
-    def _run_gemini(self, user_prompt: str) -> Dict[str, Any]:
-        """Executes using Gemini GenAI with automatic function calling."""
         tools = [
             self.lookup_customer_orders,
             self.get_order_details,
+            self.ensure_customer_exists,
             self.create_customer_order,
             self.cancel_unshipped_order,
             self.execute_sql_read_only,
@@ -142,265 +168,62 @@ class BathAgent:
             self.get_changeset_status,
             self.list_wildfire_changesets,
         ]
-        
-        try:
-            response = self.client.models.generate_content(
-                model=settings.GEMINI_MODEL,
-                contents=user_prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_INSTRUCTION,
-                    tools=tools,
-                    temperature=0.2,
-                ),
-            )
-            return {
-                "text": response.text,
-                "tool_calls": [
-                    {"name": call.name, "args": call.args}
-                    for call in (response.function_calls or [])
-                ],
-            }
-        except Exception as e:
-            # If API fails or quota exceeded, fallback to deterministic demo handler
-            print(f"⚠️ Gemini API execution error: {e}. Running demo scenario router.")
-            return self._run_heuristic(user_prompt)
 
-    def _run_heuristic(self, prompt: str) -> Dict[str, Any]:
-        """Deterministic scenario router for offline/standalone demo mode."""
-        lower_prompt = prompt.lower()
-        tool_calls = []
+        max_retries = 5
+        last_error = None
 
-        # Scenario 4: Toothpaste Tariff Troubles (Elbonia 20% tariff post July 1, 2026)
-        if "tariff" in lower_prompt or "elbonia" in lower_prompt:
-            # Step 1: Read-only query to find affected orders
-            lookup_query = """
-                SELECT 
-                    o.order_id,
-                    oi.order_item_id,
-                    p.product_id,
-                    p.name as product_name,
-                    oi.line_total,
-                    ROUND(oi.line_total * 0.20, 2) as tariff_amount,
-                    o.ship_date
-                FROM orders o
-                JOIN order_items oi ON o.order_id = oi.order_id
-                JOIN products p ON oi.product_id = p.product_id
-                JOIN suppliers s ON p.supplier_id = s.supplier_id
-                WHERE s.country_of_origin = 'Elbonia'
-                  AND p.tax_code_id = 1
-                  AND o.ship_date >= '2026-07-01'
-                ORDER BY o.order_id ASC;
-            """
-            read_res = self.execute_sql_read_only(lookup_query)
-            tool_calls.append({"tool": "MCP Toolbox: execute_sql_read_only", "args": {"query": lookup_query.strip()}, "result": read_res})
-            
-            affected_items = read_res.get("data", [])
-            num_affected = len(affected_items) or 25
-            
-            # Step 2: Formulate the paired SQL adjustment statements
-            sql_statements = [
-                "-- BathStuff FinOps Tariff Remediation: Executive Order 2026-T42",
-                "-- Appends +20% Tariff Line Item and offsetting -20% Goodwill Credit Line Item",
-                "INSERT INTO order_items (order_item_id, order_id, product_id, quantity, unit_price, line_total, note)",
-                "SELECT ",
-                "  (SELECT COALESCE(MAX(order_item_id), 5000) FROM order_items) + ROW_NUMBER() OVER(),",
-                "  o.order_id, oi.product_id, 1, ROUND(oi.line_total * 0.20, 2), ROUND(oi.line_total * 0.20, 2),",
-                "  '20% Import Tariff (Elbonia EO 2026-T42)'",
-                "FROM orders o JOIN order_items oi ON o.order_id = oi.order_id JOIN products p ON oi.product_id = p.product_id",
-                "JOIN suppliers s ON p.supplier_id = s.supplier_id WHERE s.country_of_origin = 'Elbonia' AND o.ship_date >= '2026-07-01';",
-                "",
-                "INSERT INTO order_items (order_item_id, order_id, product_id, quantity, unit_price, line_total, note)",
-                "SELECT ",
-                "  (SELECT COALESCE(MAX(order_item_id), 6000) FROM order_items) + ROW_NUMBER() OVER(),",
-                "  o.order_id, oi.product_id, 1, -ROUND(oi.line_total * 0.20, 2), -ROUND(oi.line_total * 0.20, 2),",
-                "  'Goodwill Credit - BathStuff tariff absorption courtesy discount'",
-                "FROM orders o JOIN order_items oi ON o.order_id = oi.order_id JOIN products p ON oi.product_id = p.product_id",
-                "JOIN suppliers s ON p.supplier_id = s.supplier_id WHERE s.country_of_origin = 'Elbonia' AND o.ship_date >= '2026-07-01';",
-            ]
-            full_sql = "\n".join(sql_statements)
-
-            # Step 3: Propose mutation through Wildfire
-            wf_res = self.propose_sql_mutation(
-                sql_statement=full_sql,
-                description=f"Retroactive Elbonian toothpaste 20% tariff remediation across {num_affected} orders shipped post-July 1 2026 with paired offsetting goodwill credits.",
-                validation="sandbox",
-            )
-            tool_calls.append({"tool": "Wildfire Proxy: propose_sql", "args": {"validation": "sandbox"}, "result": wf_res})
-
-            changeset = wf_res.get("changeset", {})
-            cs_id = changeset.get("changeset_id", "cs_tariffs_001")
-            review_url = changeset.get("review_console_url", f"http://localhost:8787/#changesets/{cs_id}")
-
-            response_text = (
-                f"### 🛡️ Toothpaste Tariff Remediation Proposal (Wildfire Changeset)\n\n"
-                f"I have identified all affected customer orders shipped after **July 1, 2026** containing Elbonian toothpaste.\n\n"
-                f"#### Analysis Summary:\n"
-                f"- **Affected Orders**: {num_affected} orders\n"
-                f"- **Tariff Rule**: Executive Order 2026-T42 (+20% on Elbonian Oral Care)\n"
-                f"- **Remediation Strategy**: Appended **{num_affected * 2} paired line items** (+20% Tariff Duty and -20% Goodwill Credit offset).\n"
-                f"- **Customer Impact**: Net invoice change is **$0.00** (customer total remains unchanged).\n\n"
-                f"#### 🔒 Wildfire Proxy Validation Status:\n"
-                f"- **Changeset ID**: `{cs_id}`\n"
-                f"- **Sandbox Evaluation**: `PASSED` (Simulated in isolated AlloyDB clone with 0 errors)\n"
-                f"- **Policy Check**: `POL-FIN-042` triggered (Financial balance invariant satisfied)\n"
-                f"- **Status**: `PENDING_APPROVAL` (Queued for FinOps Manager sign-off)\n\n"
-                f"👉 **[Open Wildfire Review Console]({review_url})** to inspect the row-level before/after diff and approve the merge into production."
-            )
-            return {"text": response_text, "tool_calls": tool_calls}
-
-        # Scenario 2: Cancel unshipped order (#1001 / #1042)
-        elif "cancel" in lower_prompt and "order" in lower_prompt:
-            order_id = 1001
-            res = self.cancel_unshipped_order(order_id, reason="Customer request via customer support")
-            tool_calls.append({"tool": "MCP Toolbox: cancel_unshipped_order", "args": {"order_id": order_id}, "result": res})
-            if res.get("status") == "success":
-                response_text = (
-                    f"✅ **Order #{order_id} Successfully Cancelled**\n\n"
-                    f"- **Previous Status**: `{res.get('previous_status')}`\n"
-                    f"- **Current Status**: `CANCELLED`\n"
-                    f"- **Reason**: {res.get('reason')}\n\n"
-                    f"The customer will receive an email confirmation, and no charges have been settled."
+        for attempt in range(max_retries):
+            try:
+                response = self.client.models.generate_content(
+                    model=settings.GEMINI_MODEL,
+                    contents=user_prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_INSTRUCTION,
+                        tools=tools,
+                        temperature=0.0,
+                    ),
                 )
-            else:
-                response_text = f"❌ **Cancellation Notice**: {res.get('error')}"
-            return {"text": response_text, "tool_calls": tool_calls}
+                return {
+                    "text": response.text or "Done.",
+                    "tool_calls": [
+                        {"name": call.name, "args": call.args}
+                        for call in (response.function_calls or [])
+                    ],
+                }
+            except Exception as e:
+                err_str = str(e)
+                last_error = e
+                # Check for 429 Resource Exhausted
+                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                    delay = (2 ** attempt) + random.uniform(0.1, 0.4)
+                    logger.warning(
+                        "BathAgent 429 Resource Exhausted on attempt %d/%d. Backing off for %.2fs... (%s)",
+                        attempt + 1,
+                        max_retries,
+                        delay,
+                        err_str[:120],
+                    )
+                    if attempt < max_retries - 1:
+                        time.sleep(delay)
+                        continue
+                    else:
+                        tb = traceback.format_exc()
+                        logger.error("BathAgent 429 retry limit (5) exceeded:\n%s", tb)
+                        return {
+                            "text": "The AI reasoning service is currently at capacity (429: Resource Exhausted). Please try again shortly.",
+                            "tool_calls": [],
+                            "traceback": tb,
+                        }
+                else:
+                    tb = traceback.format_exc()
+                    logger.error("BathAgent execution error:\n%s", tb)
+                    return {
+                        "text": f"I encountered an error executing this request: {e}",
+                        "tool_calls": [],
+                        "traceback": tb,
+                    }
 
-        # Scenario 3: Best selling toothpastes / read-only query
-        elif "best-selling" in lower_prompt or "top" in lower_prompt or ("toothpaste" in lower_prompt and "lookup" not in lower_prompt):
-            query = """
-                SELECT 
-                    p.product_id,
-                    p.name,
-                    s.country_of_origin,
-                    SUM(oi.quantity) as total_units_sold,
-                    SUM(oi.line_total) as total_revenue
-                FROM products p
-                JOIN order_items oi ON p.product_id = oi.product_id
-                JOIN suppliers s ON p.supplier_id = s.supplier_id
-                WHERE LOWER(p.name) LIKE '%toothpaste%' OR p.tax_code_id = 1
-                GROUP BY p.product_id, p.name, s.country_of_origin
-                ORDER BY total_units_sold DESC
-                LIMIT 3;
-            """
-            res = self.execute_sql_read_only(query)
-            tool_calls.append({"tool": "MCP Toolbox: execute_sql_read_only", "args": {"query": query.strip()}, "result": res})
-            data = res.get("data", [])
-            data_rows = "\n".join(
-                [f"| {r['name']} | {r['country_of_origin']} | {r['total_units_sold']} | ${r['total_revenue']:.2f} |" for r in data]
-            )
-            response_text = (
-                f"### Top Selling Toothpastes (Read-Only SQL Analytics)\n\n"
-                f"| Product Name | Country of Origin | Units Sold | Total Revenue |\n"
-                f"| :--- | :--- | :--- | :--- |\n"
-                f"{data_rows}\n\n"
-                f"*Query executed safely in read-only mode via MCP Toolbox.*"
-            )
-            return {"text": response_text, "tool_calls": tool_calls}
-
-        # Scenario 1: Customer order lookup for Alice Smith (ID: 101)
-        elif "alice" in lower_prompt or "101" in lower_prompt or "lookup" in lower_prompt or "order" in lower_prompt:
-            res = self.lookup_customer_orders(101)
-            tool_calls.append({"tool": "MCP Toolbox: lookup_customer_orders", "args": {"customer_id": 101}, "result": res})
-            orders = res.get("orders", [])
-            order_rows = "\n".join(
-                [f"| #{o['order_id']} | {o['order_date']} | {o['status']} | {o['total_items']} | ${o['total_amount']:.2f} |" for o in orders]
-            )
-            response_text = (
-                f"### Customer Order History: Alice Smith (Customer ID: #101)\n\n"
-                f"Found **{len(orders)}** orders on file:\n\n"
-                f"| Order ID | Order Date | Status | Items | Total Amount |\n"
-                f"| :--- | :--- | :--- | :--- | :--- |\n"
-                f"{order_rows}\n\n"
-                f"**Active Order Notice**: Order **#1001** is currently in `{orders[0]['status'] if orders else 'PROCESSING'}` status."
-            )
-            return {"text": response_text, "tool_calls": tool_calls}
-
-        # Scenario 4: Toothpaste Tariff Troubles (Elbonia 20% tariff post July 1, 2026)
-        elif "tariff" in lower_prompt or "elbonia" in lower_prompt:
-            # Step 1: Read-only query to find affected orders
-            lookup_query = """
-                SELECT 
-                    o.order_id,
-                    oi.order_item_id,
-                    p.product_id,
-                    p.name as product_name,
-                    oi.line_total,
-                    ROUND(oi.line_total * 0.20, 2) as tariff_amount,
-                    o.ship_date
-                FROM orders o
-                JOIN order_items oi ON o.order_id = oi.order_id
-                JOIN products p ON oi.product_id = p.product_id
-                JOIN suppliers s ON p.supplier_id = s.supplier_id
-                WHERE s.country_of_origin = 'Elbonia'
-                  AND p.tax_code_id = 1
-                  AND o.ship_date >= '2026-07-01'
-                ORDER BY o.order_id ASC;
-            """
-            read_res = self.execute_sql_read_only(lookup_query)
-            tool_calls.append({"tool": "MCP Toolbox: execute_sql_read_only", "args": {"query": lookup_query.strip()}, "result": read_res})
-            
-            affected_items = read_res.get("data", [])
-            num_affected = len(affected_items) or 33
-            
-            # Step 2: Formulate the paired SQL adjustment statements
-            sql_statements = [
-                "-- BathStuff FinOps Tariff Remediation: Executive Order 2026-T42",
-                "-- Appends +20% Tariff Line Item and offsetting -20% Goodwill Credit Line Item",
-                "INSERT INTO order_items (order_item_id, order_id, product_id, quantity, unit_price, line_total, note)",
-                "SELECT ",
-                "  (SELECT COALESCE(MAX(order_item_id), 5000) FROM order_items) + ROW_NUMBER() OVER(),",
-                "  o.order_id, oi.product_id, 1, ROUND(oi.line_total * 0.20, 2), ROUND(oi.line_total * 0.20, 2),",
-                "  '20% Import Tariff (Elbonia EO 2026-T42)'",
-                "FROM orders o JOIN order_items oi ON o.order_id = oi.order_id JOIN products p ON oi.product_id = p.product_id",
-                "JOIN suppliers s ON p.supplier_id = s.supplier_id WHERE s.country_of_origin = 'Elbonia' AND o.ship_date >= '2026-07-01';",
-                "",
-                "INSERT INTO order_items (order_item_id, order_id, product_id, quantity, unit_price, line_total, note)",
-                "SELECT ",
-                "  (SELECT COALESCE(MAX(order_item_id), 6000) FROM order_items) + ROW_NUMBER() OVER(),",
-                "  o.order_id, oi.product_id, 1, -ROUND(oi.line_total * 0.20, 2), -ROUND(oi.line_total * 0.20, 2),",
-                "  'Goodwill Credit - BathStuff tariff absorption courtesy discount'",
-                "FROM orders o JOIN order_items oi ON o.order_id = oi.order_id JOIN products p ON oi.product_id = p.product_id",
-                "JOIN suppliers s ON p.supplier_id = s.supplier_id WHERE s.country_of_origin = 'Elbonia' AND o.ship_date >= '2026-07-01';",
-            ]
-            full_sql = "\n".join(sql_statements)
-
-            # Step 3: Propose mutation through Wildfire
-            wf_res = self.propose_sql_mutation(
-                sql_statement=full_sql,
-                description=f"Retroactive Elbonian toothpaste 20% tariff remediation across {num_affected} orders shipped post-July 1 2026 with paired offsetting goodwill credits.",
-                validation="sandbox",
-            )
-            tool_calls.append({"tool": "Wildfire Proxy: propose_sql", "args": {"validation": "sandbox"}, "result": wf_res})
-
-            changeset = wf_res.get("changeset", {})
-            cs_id = changeset.get("changeset_id", "cs_tariffs_001")
-            review_url = changeset.get("review_console_url", f"http://localhost:8787/#changesets/{cs_id}")
-
-            response_text = (
-                f"### 🛡️ Toothpaste Tariff Remediation Proposal (Wildfire Changeset)\n\n"
-                f"I have identified all affected customer orders shipped after **July 1, 2026** containing Elbonian toothpaste.\n\n"
-                f"#### Analysis Summary:\n"
-                f"- **Affected Orders**: {num_affected} orders\n"
-                f"- **Tariff Rule**: Executive Order 2026-T42 (+20% on Elbonian Oral Care)\n"
-                f"- **Remediation Strategy**: Appended **{num_affected * 2} paired line items** (+20% Tariff Duty and -20% Goodwill Credit offset).\n"
-                f"- **Customer Impact**: Net invoice change is **$0.00** (customer total remains unchanged).\n\n"
-                f"#### 🔒 Wildfire Proxy Validation Status:\n"
-                f"- **Changeset ID**: `{cs_id}`\n"
-                f"- **Sandbox Evaluation**: `PASSED` (Simulated in isolated AlloyDB clone with 0 errors)\n"
-                f"- **Policy Check**: `POL-FIN-042` triggered (Financial balance invariant satisfied)\n"
-                f"- **Status**: `PENDING_APPROVAL` (Queued for FinOps Manager sign-off)\n\n"
-                f"👉 **[Open Wildfire Review Console]({review_url})** to inspect the row-level before/after diff and approve the merge into production."
-            )
-            return {"text": response_text, "tool_calls": tool_calls}
-
-        # Default fallback
-        else:
-            response_text = (
-                f"Hello! I am **BathAgent**, the AI operations assistant for BathStuff.\n\n"
-                f"I can help you with:\n"
-                f"- 🔍 **Customer Order Lookups**: Search orders and details by customer ID.\n"
-                f"- ❌ **Order Cancellations**: Cancel unshipped customer orders safely.\n"
-                f"- 📊 **Read-Only Analytics**: Query product sales, inventory, and supplier data via SQL.\n"
-                f"- 🛡️ **Complex Data Remediation**: Formulate and submit safe, sandbox-validated database mutations via the **Wildfire Proxy**."
-            )
-            return {"text": response_text, "tool_calls": []}
+        return {
+            "text": "The AI reasoning service is currently at capacity (429: Resource Exhausted). Please try again shortly.",
+            "tool_calls": [],
+        }

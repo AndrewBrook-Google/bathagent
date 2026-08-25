@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>bathstuff-prod – AlloyDB for PostgreSQL – andybrook-playground – Google Cloud console</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,300..500,0..1,0">
+<style>
+  :root{
+    --blue:#0b57d0;--blue-hov:#0846a8;--blue-bg:#e8f0fe;--blue-sel:#d3e3fd;
+    --txt:#202124;--sub:#5f6368;--dis:#9aa0a6;--line:#e8eaed;--line2:#dadce0;
+    --green:#188038;--green-bg:#e6f4ea;--yellow:#b06000;--yellow-bg:#fef7e0;
+    --red:#c5221f;--red-bg:#fce8e6;--purple:#7627bb;--purple-bg:#f3e8fd;
+    --surface:#fff;--pane:#f8fafd;
+    --sans:'Google Sans','Roboto',Arial,sans-serif;
+    --body:'Roboto',Arial,sans-serif;
+    --mono:'Roboto Mono',ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--surface);color:var(--txt);font:13px/1.5 var(--body)}
+  a{color:var(--blue);text-decoration:none;cursor:pointer}
+  .ms{font-family:'Material Symbols Outlined';font-weight:300;font-size:18px;line-height:1;
+      vertical-align:middle;user-select:none}
+
+  /* ---- platform bar ---- */
+  .pbar{display:flex;align-items:center;height:48px;padding:0 8px 0 16px;gap:8px;
+        border-bottom:1px solid var(--line);background:#fff;position:relative;z-index:5}
+  .pbar img.logo{height:22px;display:block}
+  .pdiv{width:1px;height:22px;background:var(--line2);margin:0 6px}
+  .projbtn{display:flex;align-items:center;gap:6px;border:none;background:none;
+        font:500 13px var(--body);color:var(--txt);padding:6px 10px;border-radius:6px;cursor:pointer}
+  .projbtn:hover{background:#f1f3f4}
+  .projbtn .ms{font-size:16px;color:var(--sub)}
+  .search{flex:1;max-width:720px;margin:0 24px;display:flex;align-items:center;gap:10px;
+        background:#f1f3f4;border-radius:24px;height:34px;padding:0 6px 0 14px;color:var(--sub)}
+  .search input{flex:1;border:none;background:none;outline:none;font:13px var(--body);color:var(--txt)}
+  .search .slash{border:1px solid var(--line2);border-radius:4px;font:11px var(--mono);
+        padding:0 5px;color:var(--sub)}
+  .pbar .grow{flex:1}
+  .iconbtn{width:36px;height:36px;border:none;background:none;border-radius:50%;cursor:pointer;
+        color:var(--sub);display:inline-flex;align-items:center;justify-content:center}
+  .iconbtn:hover{background:#f1f3f4}
+  .avatar{width:28px;height:28px;border-radius:50%;background:#7627bb;color:#fff;
+        font:500 13px var(--body);display:inline-flex;align-items:center;justify-content:center;margin:0 8px}
+
+  /* ---- shell ---- */
+  .shell{display:flex;height:calc(100vh - 49px)}
+  nav{width:256px;flex-shrink:0;border-right:1px solid var(--line);overflow-y:auto;
+      padding:8px 0 24px;background:#fff}
+  .prodhead{display:flex;align-items:center;gap:10px;padding:10px 20px 8px;
+      font:500 14px var(--sans);color:var(--txt)}
+  .prodhead .ms{color:var(--blue);font-size:20px}
+  nav .item{display:flex;align-items:center;gap:12px;height:32px;margin:2px 12px 2px 8px;
+      padding:0 12px;color:var(--txt);cursor:pointer;font:13px var(--body);
+      border-radius:0 16px 16px 0;white-space:nowrap}
+  nav .item .ms{color:var(--sub);font-size:18px;width:20px;text-align:center}
+  nav .item:hover{background:#f1f3f4}
+  nav .item.on{background:var(--blue-bg);color:var(--blue);font-weight:500}
+  nav .item.on .ms{color:var(--blue)}
+  nav .item.dis{color:var(--dis);cursor:default}
+  nav .item.dis .ms{color:var(--dis)}
+  nav .item.dis:hover{background:none}
+  nav .cap{padding:16px 20px 4px;color:var(--sub);font:500 11px var(--body);
+      letter-spacing:.8px;text-transform:uppercase}
+  nav hr{border:none;border-top:1px solid var(--line);margin:8px 0}
+
+  .content{flex:1;overflow-y:auto;min-width:0;background:#fff}
+  .inner{padding:0 24px 40px;max-width:1200px}
+  .crumbs{padding:14px 0 0;color:var(--sub);font-size:12px}
+  .crumbs a{color:var(--sub)}
+  .pagehead{display:flex;align-items:center;gap:14px;padding:4px 0 10px}
+  .pagehead h1{font:400 24px var(--sans);margin:0;letter-spacing:0}
+  .chip{display:inline-flex;align-items:center;gap:6px;border-radius:16px;
+        padding:3px 12px 3px 8px;font:500 12px var(--body)}
+  .chip.ok{background:var(--green-bg);color:var(--green)}
+  .toolbar{display:flex;gap:2px;padding:2px 0 10px;border-bottom:1px solid var(--line);
+        margin-bottom:18px}
+  .tbtn{display:inline-flex;align-items:center;gap:8px;background:none;border:none;
+        color:var(--blue);padding:7px 12px;font:500 13px var(--body);cursor:pointer;border-radius:18px}
+  .tbtn:hover{background:var(--blue-bg)}
+  .tbtn .ms{font-size:18px}
+
+  section{display:none} section.on{display:block}
+  .card{border:1px solid var(--line);border-radius:8px;background:#fff;margin-bottom:16px;overflow:hidden}
+  .card .hd{padding:14px 20px;border-bottom:1px solid var(--line);
+            font:500 15px var(--sans);display:flex;align-items:center;gap:10px}
+  .card .bd{padding:14px 20px}
+  .kv{display:grid;grid-template-columns:230px 1fr;row-gap:9px;font-size:13px}
+  .kv .k{color:var(--sub)}
+  .mono{font-family:var(--mono);font-size:12px}
+
+  table.gc{border-collapse:collapse;width:100%;font-size:13px}
+  table.gc th{color:var(--sub);font:500 12px var(--body);text-align:left;
+              border-bottom:1px solid var(--line);padding:10px 16px;white-space:nowrap}
+  table.gc td{border-bottom:1px solid #f1f3f4;padding:10px 16px;vertical-align:top}
+  table.gc tr.sel{background:var(--blue-bg)}
+  table.gc tbody tr:hover{background:var(--pane);cursor:pointer}
+
+  .st{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;white-space:nowrap}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+  .st-attached .dot{background:var(--green)} .st-attached{color:var(--green)}
+  .st-sandbox .dot{background:var(--blue)} .st-sandbox{color:var(--blue)}
+  .st-proposed .dot,.st-pending_human .dot{background:#f9ab00}
+  .st-proposed,.st-pending_human{color:var(--yellow)}
+  .st-merged .dot,.st-approved .dot{background:var(--green)} .st-merged,.st-approved{color:var(--green)}
+  .st-rejected .dot,.st-merge_failed .dot{background:var(--red)}
+  .st-rejected,.st-merge_failed{color:var(--red)}
+  .st-reverted .dot{background:var(--dis)} .st-reverted{color:var(--sub)}
+  .tag{font:500 11px var(--body);border-radius:10px;padding:1px 8px}
+  .tag.ddl{background:var(--purple-bg);color:var(--purple)}
+  .tag.lane{background:var(--blue-bg);color:var(--blue)}
+
+  button.gbtn{background:var(--blue);color:#fff;border:none;border-radius:100px;
+        padding:9px 20px;font:500 13px var(--body);cursor:pointer}
+  button.gbtn:hover{background:var(--blue-hov)}
+  button.gbtn.sec{background:#fff;color:var(--blue);border:1px solid var(--line2)}
+  button.gbtn.sec:hover{background:var(--blue-bg)}
+  button.gbtn.warn{background:#fff;color:var(--red);border:1px solid var(--line2)}
+  button.gbtn.warn:hover{background:var(--red-bg)}
+  .btnrow{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+  textarea,input,select{border:1px solid var(--line2);border-radius:4px;padding:8px 10px;
+        font:13px var(--body);color:var(--txt);width:100%;background:#fff}
+  textarea:focus,input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px;border-color:transparent}
+  textarea{font-family:var(--mono);font-size:12px}
+  .console-out{font-family:var(--mono);font-size:11.5px;background:var(--pane);
+        border:1px solid var(--line);border-radius:4px;padding:8px;margin-top:8px;
+        max-height:150px;overflow:auto;white-space:pre-wrap;color:var(--sub)}
+
+  .drawer{position:fixed;top:49px;right:-760px;width:740px;height:calc(100vh - 49px);
+        background:#fff;border-left:1px solid var(--line);
+        box-shadow:0 1px 3px rgba(60,64,67,.3),0 4px 8px 3px rgba(60,64,67,.15);
+        transition:right .2s;z-index:20;display:flex;flex-direction:column}
+  .drawer.open{right:0}
+  .drawer .dh{padding:14px 20px;border-bottom:1px solid var(--line);
+        display:flex;align-items:center;gap:12px}
+  .drawer .dh h2{font:400 18px var(--sans);margin:0}
+  .drawer .db{flex:1;overflow-y:auto;padding:16px 20px}
+  .drawer .df{padding:12px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
+  .x{margin-left:auto}
+  h3.sec{font:500 11px var(--body);color:var(--sub);margin:18px 0 6px;
+        text-transform:uppercase;letter-spacing:.8px}
+  table.diff{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:11px}
+  table.diff th,table.diff td{border:1px solid var(--line);padding:4px 6px;text-align:left}
+  table.diff th{background:var(--pane);color:var(--sub)}
+  td.chg{background:var(--green-bg)}
+  td.chg .old{color:var(--red);text-decoration:line-through}
+  td.chg .new{color:var(--green);font-weight:700}
+  .llmbox{background:var(--yellow-bg);border:1px solid #feefc3;border-radius:8px;
+        padding:10px 12px;font-size:12.5px}
+  .llmbox.ok{background:var(--green-bg);border-color:#ceead6}
+  .actlog .ev{display:flex;gap:12px;padding:8px 4px;border-bottom:1px solid #f1f3f4;font-size:12.5px}
+  .actlog .t{color:var(--sub);font-family:var(--mono);font-size:11px;width:70px;flex-shrink:0}
+  .actlog .who{color:var(--blue);font-weight:500;width:92px;flex-shrink:0}
+  .banner{background:var(--blue-bg);border:1px solid var(--blue-sel);border-radius:8px;
+        color:#174ea6;padding:10px 14px;font-size:12.5px;margin-bottom:16px;
+        display:flex;gap:10px;align-items:flex-start}
+  .banner .ms{font-size:18px;margin-top:1px}
+</style>
+</head>
+<body>
+<!-- platform bar -->
+<div class="pbar">
+  <img class="logo" src="/static/gcloud_logo.svg" alt="Google Cloud">
+  <span class="pdiv"></span>
+  <button class="projbtn"><span class="ms">apps</span> andybrook-playground
+    <span class="ms" style="font-size:18px">arrow_drop_down</span></button>
+  <div class="search"><span class="ms" style="font-size:18px">search</span>
+    <input placeholder="Search (/) for resources, docs, products, and more">
+    <span class="slash">/</span></div>
+  <div class="grow"></div>
+  <a href="http://localhost:8778/" target="_blank" style="color:var(--blue);font-size:12.5px;text-decoration:none;margin-right:12px;display:inline-flex;align-items:center;gap:4px;">🛁 BathAgent Demo ↗</a>
+  <a href="http://localhost:8779/" target="_blank" style="color:var(--blue);font-size:12.5px;text-decoration:none;margin-right:16px;display:inline-flex;align-items:center;gap:4px;font-weight:500;">📊 Business Simulator ↗</a>
+  <button class="iconbtn" title="Gemini"><span class="ms">spark</span></button>
+  <button class="iconbtn"><span class="ms">notifications</span></button>
+  <button class="iconbtn"><span class="ms">help</span></button>
+  <button class="iconbtn"><span class="ms">more_vert</span></button>
+  <span class="avatar">A</span>
+</div>
+
+<div class="shell">
+<nav>
+  <div class="prodhead"><span class="ms">database</span> AlloyDB for PostgreSQL</div>
+  <hr>
+  <a class="item on" data-s="overview" onclick="go('overview')"><span class="ms">grid_view</span>Overview</a>
+  <a class="item" data-s="readers" onclick="go('readers')"><span class="ms">dns</span>AlphaDB replicas</a>
+  <a class="item" data-s="studio" onclick="go('studio');loadSchema()"><span class="ms">code</span>AlloyDB Studio</a>
+  <a class="item dis"><span class="ms">monitoring</span>System insights</a>
+  <a class="item dis"><span class="ms">query_stats</span>Query insights</a>
+  <a class="item dis"><span class="ms">gpp_maybe</span>Data protection</a>
+  <a class="item dis"><span class="ms">lan</span>Connectivity</a>
+  <a class="item dis"><span class="ms">group</span>Users</a>
+  <a class="item dis"><span class="ms">table</span>Databases</a>
+  <a class="item" data-s="activity" onclick="go('activity')"><span class="ms">history</span>Operations</a>
+  <div class="cap">Wildfire · Preview</div>
+  <a class="item" data-s="changes" onclick="go('changes')"><span class="ms">fact_check</span>Change proposals</a>
+  <a class="item" data-s="policies" onclick="go('policies');loadPolicies()"><span class="ms">tune</span>Policies</a>
+</nav>
+
+<div class="content"><div class="inner">
+  <div class="crumbs"><a>AlloyDB for PostgreSQL</a> › <a>Clusters</a> › bathstuff-prod</div>
+  <div class="pagehead">
+    <h1>bathstuff-prod</h1>
+    <span class="chip ok"><span class="ms" style="font-size:16px">check_circle</span>Ready</span>
+    <span class="mono" style="color:var(--sub)" id="fp"></span>
+  </div>
+  <div class="toolbar">
+    <button class="tbtn" onclick="newReaderDlg()"><span class="ms">add</span>Create AlphaDB reader</button>
+    <button class="tbtn" onclick="refresh()"><span class="ms">refresh</span>Refresh</button>
+  </div>
+
+  <section id="overview" class="on">
+    <div class="banner"><span class="ms">info</span><div>AlphaDB replicates this cluster to a
+      <b>Rapid Bucket</b> (Iceberg PostgreSQL format, ≤1 s lag). Ephemeral readers attach to the
+      bucket with zero impact on the primary. Writes return through the <b>Wildfire</b>
+      validation proxy only.</div></div>
+    <div class="card"><div class="hd">Primary instance</div><div class="bd kv">
+      <span class="k">Instance</span><span>bathstuff-prod-primary &nbsp;
+        <span class="st st-attached"><span class="dot"></span>Ready</span></span>
+      <span class="k">Zone / machine</span><span>us-central1-a · 8 vCPU, 64 GB</span>
+      <span class="k">Rapid Bucket replication</span><span>Enabled · gs://bathstuff-rapid · lag &lt; 1 s</span>
+      <span class="k">Schema fingerprint</span><span class="mono" id="ov-fp"></span>
+      <span class="k">Orders</span><span id="ov-orders"></span>
+      <span class="k">Products</span><span id="ov-products"></span>
+      <span class="k">Wildfire merges applied</span><span id="ov-merge"></span>
+    </div></div>
+    <div class="card"><div class="hd">AlphaDB replicas
+        <span style="color:var(--sub);font-weight:400;font-size:13px" id="ov-rc"></span></div>
+      <div class="bd" id="ov-readers"></div></div>
+  </section>
+
+  <section id="readers">
+    <div class="card"><div class="hd">Replica instances
+        <span style="color:var(--sub);font-weight:400;font-size:13px">· ephemeral PostgreSQL readers on Cloud Run</span></div>
+      <div class="bd" style="padding:0">
+      <table class="gc"><thead><tr>
+        <th>Replica</th><th>State</th><th>Provisioned for</th><th>Role</th><th>Basis</th><th>Actions</th>
+      </tr></thead><tbody id="rd-rows"></tbody></table>
+    </div></div>
+    <div class="card"><div class="hd">SQL console
+        <span class="mono" id="con-rd" style="color:var(--sub);font-weight:400"></span></div>
+      <div class="bd">
+        <textarea id="con-sql" rows="4" placeholder="Run SQL on the selected reader. Readers are read-only while ATTACHED — detach to open a Wildfire write session."></textarea>
+        <div class="btnrow">
+          <button class="gbtn sec" onclick="execSql()">Run</button>
+          <button class="gbtn" onclick="propose()">Submit to Wildfire</button>
+        </div>
+        <div class="console-out" id="con-out">—</div>
+      </div></div>
+  </section>
+
+  <section id="studio">
+    <div class="banner" style="background:var(--red-bg);border-color:#f5c6c0;color:#a50e0e">
+      <span class="ms">warning</span><div>Studio runs SQL <b>directly on the primary instance</b>.
+      Statements executed here do not go through Wildfire validation.</div></div>
+    <div style="display:flex;gap:16px;align-items:flex-start">
+      <div class="card" style="width:260px;flex-shrink:0">
+        <div class="hd" style="padding:10px 14px;font-size:13px">Explorer
+          <span class="tag lane mono" style="margin-left:6px">bathstuff</span>
+          <a style="margin-left:auto;font-weight:400;font-size:12px" onclick="loadSchema()">refresh</a></div>
+        <div class="bd" id="sd-tree" style="padding:6px 8px;max-height:520px;overflow:auto"></div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="card"><div class="bd">
+          <textarea id="sd-sql" rows="6" spellcheck="false"
+            placeholder="Write SQL against the primary… (Ctrl/⌘+Enter to run)">SELECT product_id, sku, name, supplier_id, tax_code_id FROM products ORDER BY product_id;</textarea>
+          <div class="btnrow" style="align-items:center">
+            <button class="gbtn" onclick="studioRun()"><span class="ms" style="font-size:16px;margin-right:4px">play_arrow</span>Run</button>
+            <span id="sd-stat" style="color:var(--sub);font-size:12px"></span>
+          </div>
+        </div></div>
+        <div class="card"><div class="hd" style="font-size:13px">Results</div>
+          <div class="bd" id="sd-res" style="padding:0;overflow-x:auto;max-height:420px;overflow-y:auto">
+            <div style="padding:16px;color:var(--sub)">Run a query to see results.</div>
+          </div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="changes">
+    <div class="card"><div class="hd">Change proposals
+        <span style="color:var(--sub);font-weight:400;font-size:13px">· Wildfire merge queue</span></div>
+      <div class="bd" style="padding:0">
+      <table class="gc"><thead><tr>
+        <th>Change</th><th>Timestamp</th><th>Status</th><th>Agent</th><th>Rows</th><th>Lane</th><th>Task</th>
+      </tr></thead><tbody id="cs-rows"></tbody></table>
+    </div></div>
+  </section>
+
+  <section id="policies">
+    <div class="banner"><span class="ms">info</span><div>Role policies decide how a proposed
+      change is reviewed: deterministic rules first (scope / row limits / DDL), then routing —
+      <b>auto</b> (rules only), <b>llm</b> (agentic review), or <b>human</b>.
+      DDL and anything above the auto limit always require a human.</div></div>
+    <div id="pol-cards"></div>
+  </section>
+
+  <section id="activity">
+    <div class="card"><div class="hd">Operations · activity log</div>
+      <div class="bd actlog" id="timeline"></div></div>
+  </section>
+</div></div>
+</div>
+
+<!-- review drawer -->
+<div class="drawer" id="drawer">
+  <div class="dh"><h2>Change <span class="mono" id="rv-id"></span></h2>
+    <span class="st" id="rv-status"><span class="dot"></span><span id="rv-status-t"></span></span>
+    <button class="iconbtn x" onclick="$('drawer').classList.remove('open')"><span class="ms">close</span></button></div>
+  <div class="db">
+    <div class="kv" style="grid-template-columns:150px 1fr">
+      <span class="k">Timestamp</span><span class="mono" id="rv-time"></span>
+      <span class="k">Agent</span><span id="rv-actor"></span>
+      <span class="k">Task</span><span id="rv-task"></span>
+      <span class="k">Review lane</span><span id="rv-lane"></span>
+      <span class="k">Merge result</span><span id="rv-merge"></span>
+    </div>
+    <h3 class="sec">LLM reviewer <span id="rv-llm-src" class="mono" style="text-transform:none;letter-spacing:0;color:var(--dis)"></span></h3>
+    <div id="rv-llm" class="llmbox">—</div>
+    <h3 class="sec">Agent trajectory (session history)</h3>
+    <div id="rv-traj"></div>
+    <h3 class="sec">Captured SQL log (formal write capture)</h3>
+    <div id="rv-sql" class="mono" style="font-size:11.5px;color:var(--sub)"></div>
+    <h3 class="sec" id="rv-diff-title">Data diff</h3>
+    <div id="rv-diff-stats" style="font-size:12.5px;color:var(--sub);margin-bottom:6px"></div>
+    <div id="rv-diff" style="overflow-x:auto"></div>
+  </div>
+  <div class="df" id="rv-actions"></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const post=(u,b)=>fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},
+                 body:JSON.stringify(b)}).then(r=>r.json());
+let SEL=null;
+
+function go(s){
+  document.querySelectorAll('nav .item').forEach(i=>i.classList.toggle('on',i.dataset.s===s));
+  document.querySelectorAll('section').forEach(x=>x.classList.toggle('on',x.id===s));
+}
+function stChip(s){return `<span class="st st-${s}"><span class="dot"></span>${
+  {attached:'Attached · read-only',sandbox:'Detached · Wildfire session',
+   proposed:'Proposal submitted',merged:'Merged · released',
+   pending_human:'Needs human review',approved:'Approved',rejected:'Rejected',
+   merge_failed:'Merge failed',reverted:'Reverted'}[s]||s}</span>`}
+
+function fmtTime(ts){
+  if(!ts)return '—';
+  const d=new Date(ts*1000);
+  return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+}
+
+async function refresh(){
+  const st=await fetch('/api/state').then(r=>r.json());
+  $('fp').textContent='schema '+st.primary.schema_fp;
+  $('ov-fp').textContent=st.primary.schema_fp;
+  $('ov-orders').textContent=st.primary.orders;
+  $('ov-products').textContent=st.primary.products;
+  $('ov-merge').textContent=st.primary.merged_actions;
+  const live=st.branches.filter(b=>b.status!=='merged');
+  $('ov-rc').textContent=`· ${live.length} live / ${st.branches.length} total`;
+  $('ov-readers').innerHTML=live.slice(0,6).map(b=>
+    `<div style="padding:4px 0">${stChip(b.status)} <a onclick="selReader('${b.id}');go('readers')" class="mono">${b.id}</a>
+     <span style="color:var(--sub)"> — for ${b.actor} · role ${b.role}</span></div>`).join('')
+    ||'<span style="color:var(--sub)">No live replicas. Create one to give an agent access.</span>';
+
+  $('rd-rows').innerHTML=st.branches.map(b=>{
+    const acts=[];
+    if(b.status==='attached')acts.push(`<a onclick="event.stopPropagation();detach('${b.id}')">Detach (start Wildfire session)</a>`);
+    if(b.status==='sandbox'){acts.push(`<a onclick="event.stopPropagation();selReader('${b.id}')">Open console</a>`);
+      acts.push(`<a onclick="event.stopPropagation();resync('${b.id}')">Re-sync</a>`);}
+    return `<tr class="${SEL===b.id?'sel':''}" onclick="selReader('${b.id}')">
+      <td class="mono">${b.id}</td><td>${stChip(b.status)}</td>
+      <td>${b.actor}</td><td>${b.role}</td>
+      <td class="mono">${(b.basis_fp||'').slice(0,10)}</td>
+      <td>${acts.join(' · ')||'—'}</td></tr>`;
+  }).join('');
+  $('con-rd').textContent=SEL?('· '+SEL):'· no reader selected';
+
+  $('cs-rows').innerHTML=st.changesets.map(c=>
+    `<tr onclick="openCs('${c.id}')">
+     <td class="mono">${c.id.slice(0,8)}${c.reverts?' <span class="tag lane">revert</span>':''}</td>
+     <td class="mono" style="color:var(--sub);font-size:12px;white-space:nowrap">${fmtTime(c.created_at)}</td>
+     <td>${stChip(c.status)}</td><td>${c.actor}</td>
+     <td>${c.summary?c.summary.net_diff_rows:''}${c.summary&&c.summary.ddl?' <span class="tag ddl">DDL</span>':''}</td>
+     <td><span class="tag lane">${c.lane}</span></td>
+     <td style="color:var(--sub);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.task}</td></tr>`).join('');
+}
+function selReader(id){SEL=id;refresh()}
+async function newReaderDlg(){
+  const name=prompt('Replica name (used as the instance id):','dev-workspace');
+  if(name===null)return;
+  const actor=prompt('Provision for agent identity (e.g. wingman-1, devbot):','devbot');
+  if(!actor)return;
+  const role=prompt('Provision for role — authorization binding, fixed for the '
+    +'lifetime of this replica (booking / developer / analytics):','developer');
+  if(!role)return;
+  const r=await post('/api/branches',{name,actor,role});
+  if(r.error)return alert(r.error);
+  SEL=r.reader_id; refresh(); go('readers');
+  alert(`Replica ${r.reader_id} is ATTACHED (read-only, basis `
+    +`${(r.basis_fp||'').slice(0,12)}).\n\nHand this id to the agent:\n  `
+    +`wf attach ${r.reader_id}`);
+}
+async function detach(id){await post(`/api/branches/${id}/detach`,{});SEL=id;refresh()}
+async function resync(id){await post(`/api/branches/${id}/resync`,{});refresh()}
+async function execSql(){
+  if(!SEL)return $('con-out').textContent='select a reader first';
+  const r=await post(`/api/branches/${SEL}/exec`,{sql:$('con-sql').value});
+  $('con-out').textContent=r.error?('ERROR: '+r.error):
+    (r.rows?JSON.stringify(r.rows.slice(0,5),null,1):(r.rowcount+' row(s) affected'));
+  refresh();
+}
+async function propose(){
+  if(!SEL)return;
+  const task=prompt('What is this change for? (one line — goes to the reviewer)','');
+  if(task===null)return;
+  const r=await post(`/api/branches/${SEL}/propose`,{task});
+  $('con-out').textContent=JSON.stringify(r).slice(0,500);
+  refresh(); if(r.changeset_id){go('changes');openCs(r.changeset_id);}
+}
+
+async function openCs(cid){
+  const c=await fetch('/api/changesets/'+cid).then(r=>r.json());
+  $('drawer').classList.add('open');
+  $('rv-id').textContent=cid.slice(0,8);
+  const stEl=$('rv-status');stEl.className='st st-'+c.status;$('rv-status-t').textContent=c.status;
+  $('rv-time').textContent=c.created_at?new Date(c.created_at*1000).toLocaleString():'—';
+  $('rv-actor').textContent=`${c.actor} (${c.role})`;
+  $('rv-task').textContent=c.task+(c.reverts?` · reverts ${c.reverts.slice(0,8)}`:'');
+  $('rv-lane').innerHTML=`<span class="tag lane">${c.lane}</span> `+
+     Object.entries(c.checks||{}).map(([k,v])=>`${v?'✓':'✗'} ${k}`).join(' · ');
+  $('rv-merge').textContent=c.merge_result?
+     `${c.merge_result.outcome} ${c.merge_result.detail||''} (${c.merge_result.lock_window_ms} ms lock)`:'—';
+  $('rv-llm').className='llmbox'+(c.review&&c.review.verdict==='approve'?' ok':'');
+  $('rv-llm-src').textContent=c.review&&c.review.source?('· '+c.review.source):'';
+  $('rv-llm').innerHTML=c.review?`<b>${c.review.verdict.toUpperCase()}</b> — ${escq(c.review.reason)}`
+                                :'not consulted (auto lane, deterministic reject, or revert)';
+  $('rv-traj').innerHTML=renderTraj(c.trajectory||[]);
+  $('rv-sql').innerHTML=(c.sql_log||[]).map(s=>'· '+s.sql.slice(0,120)).join('<br>')||'—';
+  const rows=c.net_diff_sample||[];
+  const total=c.net_diff_total||rows.length;
+  const OPN={U:'updated',I:'inserted',D:'deleted'};
+  $('rv-diff-stats').innerHTML=c.diff_stats?Object.entries(c.diff_stats).map(([t,ops])=>
+    `<b>${t}</b> — `+Object.entries(ops).filter(([,n])=>n>0)
+      .map(([op,n])=>`${n} ${OPN[op]}`).join(', ')).join(' &nbsp;·&nbsp; ')
+    +` &nbsp;·&nbsp; ${total} row${total===1?'':'s'} total`:'';
+  if(rows.length){
+    $('rv-diff-title').textContent=rows.length>=total
+      ?`Data diff (full · ${total} row${total===1?'':'s'})`
+      :`Data diff (showing ${rows.length} of ${total} rows)`;
+    const cols=[...new Set(rows.flatMap(d=>d.changed))].slice(0,8);
+    $('rv-diff').innerHTML=`<table class="diff"><tr><th>op</th><th>pk</th>${cols.map(c=>`<th>${c}</th>`).join('')}</tr>`+
+      rows.map(d=>`<tr><td>${d.op}</td><td>${JSON.stringify(d.pk)}</td>`+
+        cols.map(col=>{
+          const b=d.before?d.before[col]:null,a=d.after?d.after[col]:null;
+          return d.changed.includes(col)
+            ?`<td class="chg"><span class="old">${fmt(b)}</span> → <span class="new">${fmt(a)}</span></td>`
+            :`<td>${fmt(a??b)}</td>`;
+        }).join('')+'</tr>').join('')+'</table>'+
+      (rows.length<total?`<div style="color:var(--sub);font-size:11px;padding:6px 0">truncated — showing first ${rows.length} of ${total} rows; the full diff is stored in the changeset</div>`:'');
+  } else {$('rv-diff-title').textContent='Data diff';
+    $('rv-diff').innerHTML='<span style="color:var(--sub)">no row changes</span>';}
+  let acts='';
+  if(c.status==='pending_human')
+    acts=`<button class="gbtn" onclick="approveMerge('${cid}')">Approve & merge</button>
+          <button class="gbtn sec" onclick="review('${cid}','approved')">Approve only</button>
+          <button class="gbtn warn" onclick="review('${cid}','rejected')">Reject</button>`;
+  if(c.status==='approved')
+    acts=`<button class="gbtn" onclick="mergeCs('${cid}')">Merge (as operator)</button>
+          <span style="color:var(--sub);font-size:12px">approved — the apply runs
+          under the merge caller's credentials</span>`;
+  if(c.status==='merged'&&c.basis_fp===c.final_fp&&!c.reverts)
+    acts=`<button class="gbtn warn" onclick="revert('${cid}')">Revert change</button>`;
+  $('rv-actions').innerHTML=acts||'<span style="color:var(--sub);font-size:12px">no actions available</span>';
+}
+function fmt(v){return v===null||v===undefined?'∅':String(v).slice(0,24)}
+function escq(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+async function review(cid,v){await post(`/api/changesets/${cid}/review`,{verdict:v});refresh();openCs(cid)}
+async function mergeCs(cid){const r=await post(`/api/changesets/${cid}/merge`,{merger:'operator'});
+  refresh();openCs(cid);
+  if(r.merge&&r.merge.outcome==='permission_denied')alert('Primary DB refused: '+r.merge.detail)}
+async function approveMerge(cid){await post(`/api/changesets/${cid}/review`,{verdict:'approved'});
+  await mergeCs(cid)}
+async function revert(cid){const r=await post(`/api/changesets/${cid}/revert`,{requester:'operator'});refresh();
+  if(r.error)alert(r.error);
+  if(r.revert_changeset_id)openCs(r.revert_changeset_id)}
+function renderTraj(tr){
+  if(!tr.length)return '<span style="color:var(--sub)">no session history attached '+
+    '(direct console session — see SQL log below)</span>';
+  return '<div style="display:flex;flex-direction:column;gap:4px">'+tr.map(e=>{
+    if(e.t==='user')return `<div style="align-self:flex-end;max-width:85%;background:var(--blue-bg);
+      border-radius:12px;padding:6px 10px;font-size:12.5px">🧑 ${escq(e.text)}</div>`;
+    if(e.t==='agent')return `<div style="align-self:flex-start;max-width:85%;background:#f1f3f4;
+      border-radius:12px;padding:6px 10px;font-size:12.5px">🤖 ${escq(e.text)}</div>`;
+    if(e.t==='confirm')return `<div style="align-self:center;color:var(--yellow);
+      font-size:12px">✋ ${escq(e.text)}</div>`;
+    if(e.t==='thought')return `<div style="color:var(--sub);font-style:italic;
+      font-size:11.5px;padding-left:8px">💭 ${escq(e.text)}</div>`;
+    if(e.t==='tool')return `<div class="mono" style="font-size:11px;color:var(--sub);
+      border-left:2px solid var(--line);padding:2px 8px;margin-left:8px">
+      🔧 <b style="color:var(--blue)">${escq(e.name)}</b> ${escq(JSON.stringify(e.args||{}).slice(0,120))}
+      ${e.obs!==undefined?'<br>&nbsp;&nbsp;→ '+escq(String(e.obs).slice(0,180)):''}</div>`;
+    return `<div style="color:var(--sub);font-size:11px">${escq(JSON.stringify(e).slice(0,150))}</div>`;
+  }).join('')+'</div>';
+}
+
+// ---- Policies ----
+async function loadPolicies(){
+  const p=await fetch('/api/policies').then(r=>r.json());
+  const sortedEntries=Object.entries(p).sort(([a],[b])=>a.localeCompare(b));
+  $('pol-cards').innerHTML=sortedEntries.map(([role,c])=>`
+    <div class="card"><div class="hd">Role: <span class="mono">${role}</span></div>
+    <div class="bd"><div class="kv" style="grid-template-columns:240px 340px;row-gap:10px">
+      <span class="k">Allowed tables</span>
+        <input id="p-${role}-tables" value="${c.tables.join(', ')}">
+      <span class="k">Hard row limit (reject above)</span>
+        <input id="p-${role}-hard" type="number" value="${c.hard_max_rows}">
+      <span class="k">Auto-review limit (human above)</span>
+        <input id="p-${role}-auto" type="number" value="${c.auto_max_rows}">
+      <span class="k">Schema changes (DDL)</span>
+        <select id="p-${role}-ddl">
+          <option value="false" ${!c.ddl?'selected':''}>Forbidden</option>
+          <option value="true" ${c.ddl?'selected':''}>Allowed (always human-reviewed)</option>
+        </select>
+      <span class="k">Small-change reviewer</span>
+        <select id="p-${role}-rev">
+          <option ${c.small_reviewer==='auto'?'selected':''} value="auto">auto — deterministic rules only</option>
+          <option ${c.small_reviewer==='llm'?'selected':''} value="llm">llm — agentic review, escalates if unsure</option>
+          <option ${c.small_reviewer==='human'?'selected':''} value="human">human — always require sign-off</option>
+        </select>
+      <span class="k">LLM review guidance<br>
+        <span style="font-weight:400;color:var(--dis);font-size:11px">sent to Gemini with every review for this role</span></span>
+        <textarea id="p-${role}-guid" rows="4" style="font-family:var(--body);font-size:12.5px">${c.llm_guidance||''}</textarea>
+    </div>
+    <div class="btnrow"><button class="gbtn" onclick="savePolicy('${role}')">Save</button>
+      <span id="p-${role}-msg" style="color:var(--green);font-size:12px;align-self:center"></span></div>
+    </div></div>`).join('');
+}
+async function savePolicy(role){
+  const cfg={tables:$(`p-${role}-tables`).value.split(',').map(s=>s.trim()).filter(Boolean),
+    hard_max_rows:+$(`p-${role}-hard`).value, auto_max_rows:+$(`p-${role}-auto`).value,
+    ddl:$(`p-${role}-ddl`).value==='true', small_reviewer:$(`p-${role}-rev`).value,
+    llm_guidance:$(`p-${role}-guid`).value};
+  const r=await fetch('/api/policies/'+role,{method:'PUT',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)}).then(r=>r.json());
+  $(`p-${role}-msg`).textContent=r.ok?'Saved ✓':(r.error||'error');
+  setTimeout(()=>$(`p-${role}-msg`).textContent='',2500);
+}
+
+// ---- Studio ----
+async function loadSchema(){
+  const s=await fetch('/api/studio/schema').then(r=>r.json());
+  $('sd-tree').innerHTML=s.tables.map(t=>`
+    <div style="padding:3px 4px">
+      <a class="mono" style="font-weight:500" onclick="sdTable('${t.name}')">
+        <span class="ms" style="font-size:14px;color:var(--sub)">table</span> ${t.name}</a>
+      <span style="color:var(--sub);font-size:11px">${t.rows} rows</span>
+      <div style="padding-left:18px">${t.columns.map(c=>
+        `<div class="mono" style="font-size:11px;color:var(--sub);padding:1px 0">
+           ${c.pk?'<span class="ms" style="font-size:12px;color:#b06000">key</span>':'·'} ${c.name}
+           <span style="color:var(--dis)">${c.type}</span></div>`).join('')}
+      </div></div>`).join('');
+}
+function sdTable(t){$('sd-sql').value=`SELECT * FROM ${t} LIMIT 50;`;studioRun()}
+async function studioRun(){
+  $('sd-stat').textContent='running…';
+  const r=await post('/api/studio/query',{sql:$('sd-sql').value});
+  if(r.error){$('sd-stat').textContent='';
+    $('sd-res').innerHTML=`<div style="padding:14px;color:var(--red);font-family:var(--mono);font-size:12px">${escq(r.error)}</div>`;
+    return;}
+  if(r.columns){
+    $('sd-stat').textContent=`${r.rowcount} row(s) · ${r.ms} ms`;
+    $('sd-res').innerHTML=`<table class="gc"><thead><tr>${
+      r.columns.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${
+      r.rows.map(row=>`<tr style="cursor:default">${
+        row.map(v=>`<td class="mono" style="font-size:11.5px">${
+          v===null?'<span style=color:var(--dis)>NULL</span>':escq(String(v)).slice(0,80)}</td>`).join('')}</tr>`).join('')
+      }</tbody></table>`+(r.rows.length>=200?'<div style="padding:8px;color:var(--sub);font-size:11px">showing first 200 rows</div>':'');
+  }else{
+    $('sd-stat').textContent=`${r.rowcount} row(s) affected · ${r.ms} ms — direct write on primary`;
+    $('sd-res').innerHTML=`<div style="padding:14px;color:var(--green)">OK — ${r.rowcount} row(s) affected.</div>`;
+    refresh();
+  }
+}
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'&&document.activeElement===$('sd-sql'))studioRun();
+});
+
+const es=new EventSource('/api/events/stream');
+es.onmessage=m=>{
+  const e=JSON.parse(m.data);
+  if(e.kind==='reset'){$('timeline').innerHTML='';SEL=null;}   // world rebuilt
+  const d=document.createElement('div');d.className='ev';
+  d.innerHTML=`<span class="t">${new Date(e.ts*1000).toLocaleTimeString()}</span>
+    <span class="who">${e.actor}</span><span>${e.message}</span>`;
+  $('timeline').prepend(d); refresh();
+};
+refresh();
+</script>
+</body>
+</html>
