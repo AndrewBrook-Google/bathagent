@@ -641,7 +641,6 @@
       <div class="dot"></div>
       AlloyDB bathstuff-prod
     </div>
-    <span id="header-orders-count" style="color:var(--text-secondary); font-size:12.5px;">Loading metrics…</span>
   </div>
 
   <div class="header-links">
@@ -941,7 +940,6 @@ async function updateStats() {
       $('stat-orders').textContent = Number(orders).toLocaleString();
       $('stat-products').textContent = Number(products).toLocaleString();
       $('stat-merges').textContent = Number(merges).toLocaleString();
-      $('header-orders-count').innerHTML = `<b>${Number(orders).toLocaleString()}</b> live orders · <b>${products}</b> products · <b>250</b> customers`;
     }
   } catch(e) {}
 }
