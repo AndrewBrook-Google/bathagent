@@ -1,6 +1,6 @@
-"""Branch provider & Diff Capture Engine: connects directly to AlloyDB cluster (bathstuff-prod).
+"""Branch provider & Diff Capture Engine for Wildfire.
 
-Executes safe DQL queries against AlloyDB PostgreSQL and performs authoritative,
+Connects directly to the PostgreSQL / AlloyDB instance and performs authoritative,
 database-grounded diff capture (evaluating actual before/after row states and primary keys)
 for the Wildfire policy engine and reviewer.
 """
@@ -26,6 +26,9 @@ _COLS_CACHE: Dict[str, List[str]] = {}
 
 
 def _get_schema_metadata() -> Tuple[Dict[str, str], Dict[str, List[str]]]:
+    """Introspects primary keys and column definitions from database catalogs.
+    Fails immediately if schema cannot be introspected.
+    """
     global _PK_CACHE, _COLS_CACHE
     if _PK_CACHE and _COLS_CACHE:
         return _PK_CACHE, _COLS_CACHE
@@ -48,30 +51,33 @@ def _get_schema_metadata() -> Tuple[Dict[str, str], Dict[str, List[str]]]:
         """)
         for r in cols_rows:
             _COLS_CACHE.setdefault(r["table_name"], []).append(r["column_name"])
+
+        if not _COLS_CACHE:
+            raise RuntimeError("Database returned empty schema columns from information_schema.")
+
     except Exception as e:
-        print(f"[branchmgr] Warning: schema metadata query failed ({e}). Using default schema map.")
-        _PK_CACHE = {
-            "customers": "customer_id",
-            "products": "product_id",
-            "orders": "order_id",
-            "order_items": "order_item_id",
-            "suppliers": "supplier_id",
-            "tax_codes": "tax_code_id",
-            "tax_eligibility_rules": "rule_id",
-            "product_pricing_history": "pricing_id",
-        }
-        _COLS_CACHE = {
-            "customers": ["customer_id", "full_name", "email", "shipping_country"],
-            "products": ["product_id", "sku", "name", "supplier_id", "tax_code_id"],
-            "orders": ["order_id", "customer_id", "order_date", "ship_date", "status", "total_price", "amount_paid", "total_outstanding"],
-            "order_items": ["order_item_id", "order_id", "product_id", "quantity", "unit_price", "line_total"],
-            "suppliers": ["supplier_id", "name", "country_of_origin"],
-            "tax_codes": ["tax_code_id", "code_name", "category", "default_rate"],
-            "tax_eligibility_rules": ["rule_id", "country_of_origin", "category", "additional_tariff_rate", "effective_date", "note"],
-            "product_pricing_history": ["pricing_id", "product_id", "unit_price", "effective_start", "effective_end"],
-        }
+        _PK_CACHE.clear()
+        _COLS_CACHE.clear()
+        raise RuntimeError(f"Database schema introspection failed: {e}. Validator cannot safely capture diffs.") from e
 
     return _PK_CACHE, _COLS_CACHE
+
+
+def compute_schema_fingerprint() -> str:
+    """Computes a stable hash of public schema column definitions."""
+    try:
+        rows = alloydb_client.execute_sql("""
+            SELECT table_name || '.' || column_name || ':' || data_type || ':' || is_nullable as col_spec
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name NOT LIKE 'wf%'
+            ORDER BY table_name, ordinal_position;
+        """)
+        if not rows:
+            return "empty_schema"
+        spec_str = "|".join(r["col_spec"] for r in rows)
+        return hashlib.md5(spec_str.encode()).hexdigest()[:16]
+    except Exception as e:
+        raise RuntimeError(f"Failed to compute schema fingerprint: {e}") from e
 
 
 def _parse_set_clause(set_str: str) -> Dict[str, Any]:
@@ -91,8 +97,8 @@ class AlloyDBSandboxSession:
 
     def __init__(self, branch_id: str):
         self.branch_id = branch_id
-        self.basis_fp = "c384dc8b_bathstuff"
-        self.final_fp = "c384dc8b_bathstuff"
+        self.basis_fp = compute_schema_fingerprint()
+        self.final_fp = self.basis_fp
         self.segments: List[Dict[str, Any]] = []
         self.sql_log: List[Dict[str, Any]] = []
         self.row_diffs: Dict[str, Dict[str, Any]] = {}  # key: f"{table}:{pk_val}" -> diff_entry
@@ -101,11 +107,11 @@ class AlloyDBSandboxSession:
         self.segments = []
         self.sql_log = []
         self.row_diffs = {}
-        self.basis_fp = "c384dc8b_bathstuff"
-        self.final_fp = "c384dc8b_bathstuff"
+        self.basis_fp = compute_schema_fingerprint()
+        self.final_fp = self.basis_fp
 
     def query(self, sql: str) -> List[Dict[str, Any]]:
-        """Execute real query directly against AlloyDB bathstuff-prod."""
+        """Execute real query directly against primary database."""
         return alloydb_client.execute_sql(sql)
 
     def execute(self, sql: str) -> int:
@@ -134,10 +140,13 @@ class AlloyDBSandboxSession:
             table = m.group(1).lower()
             set_str = m.group(2).strip()
             where_str = m.group(3).strip() if m.group(3) else "1=1"
-            pk_col = pk_map.get(table, "id")
+            pk_col = pk_map.get(table)
+            if not pk_col:
+                raise ValueError(f"Table '{table}' has no primary key defined. Wildfire requires primary keys to compute deterministic row diffs.")
+
             cols = cols_map.get(table, [pk_col])
 
-            # Query the real before-rows from AlloyDB
+            # Query the real before-rows from database
             lookup_query = f"SELECT * FROM {table} WHERE {where_str};"
             before_rows = alloydb_client.execute_sql(lookup_query)
             set_assignments = _parse_set_clause(set_str)
@@ -213,9 +222,11 @@ class AlloyDBSandboxSession:
 
         elif head == "DELETE":
             m = re.search(r'DELETE\s+FROM\s+([a-zA-Z0-9_]+)(?:\s+WHERE\s+(.*))?$', clean_sql, re.IGNORECASE | re.DOTALL)
-            table = m.group(1).lower() if m else "orders"
+            table = m.group(1).lower() if m else ""
             where_str = m.group(2).strip() if (m and m.group(2)) else "1=1"
-            pk_col = pk_map.get(table, "id")
+            pk_col = pk_map.get(table)
+            if not pk_col:
+                raise ValueError(f"Table '{table}' has no primary key defined. Wildfire requires primary keys to compute deterministic row diffs.")
 
             lookup_query = f"SELECT * FROM {table} WHERE {where_str};"
             deleted_rows = alloydb_client.execute_sql(lookup_query)

@@ -1,21 +1,21 @@
-"""Direct AlloyDB client for BathStuff cluster (bathstuff-prod).
+"""Google Cloud AlloyDB PostgreSQL Client.
 
 Executes SQL statements over the Google Cloud AlloyDB MCP / Data API endpoint
-using Application Default Credentials. Provides direct DML/DQL access to
-bathstuff-prod in andybrook-playground (us-central1).
+using Application Default Credentials (ADC).
 """
 import datetime
 import json
+import os
 import subprocess
 import time
 from typing import Any, Dict, List, Optional
 
 import httpx
 
-PROJECT = "andybrook-playground"
-REGION = "us-central1"
-CLUSTER = "bathstuff-prod"
-INSTANCE = "bathstuff-prod-primary"
+PROJECT = os.getenv("GCP_PROJECT", os.getenv("GOOGLE_CLOUD_PROJECT", "andybrook-playground"))
+REGION = os.getenv("GCP_REGION", os.getenv("GOOGLE_CLOUD_REGION", "us-central1"))
+CLUSTER = os.getenv("ALLOYDB_CLUSTER", "bathstuff-prod")
+INSTANCE = os.getenv("ALLOYDB_INSTANCE", f"{CLUSTER}-primary")
 INSTANCE_URI = f"projects/{PROJECT}/locations/{REGION}/clusters/{CLUSTER}/instances/{INSTANCE}"
 MCP_URL = "https://alloydb.googleapis.com/mcp"
 
@@ -40,11 +40,11 @@ def _get_access_token() -> str:
 
 
 def execute_sql(sql: str, database: str = "postgres") -> List[Dict[str, Any]]:
-    """Execute arbitrary SQL on bathstuff-prod and return list of row dicts."""
+    """Execute arbitrary SQL on the primary PostgreSQL database and return list of row dicts."""
     token = _get_access_token()
     headers = {
         "Authorization": f"Bearer {token}",
-        "User-Agent": "datacloud.jetski",
+        "User-Agent": "datacloud.wildfire",
         "Content-Type": "application/json",
     }
     req = {

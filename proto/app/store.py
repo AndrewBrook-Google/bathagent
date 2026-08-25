@@ -31,15 +31,15 @@ DEFAULT_POLICIES = {
     "bathagent": {"tables": ["orders", "order_items", "customers"], "hard_max_rows": 50,
                   "auto_max_rows": 20, "ddl": False, "small_reviewer": "llm",
                   "llm_guidance":
-                  "Approve routine BathStuff customer orders, item quantity adjustments, "
-                  "and customer address updates. Escalate price discounts > 25%, "
-                  "deletions, or edits to other customer orders."},
+                  "Approve routine customer orders, item quantity adjustments, "
+                  "and customer record updates. Escalate unexpected price discounts > 25%, "
+                  "bulk deletions, or edits to unrelated tables."},
     "booking":   {"tables": ["orders", "order_items", "customers"], "hard_max_rows": 50,
                   "auto_max_rows": 20, "ddl": False, "small_reviewer": "llm",
                   "llm_guidance":
-                  "Approve routine BathStuff customer orders, item quantity adjustments, "
-                  "and customer address updates. Escalate price discounts > 25%, "
-                  "deletions, or edits to other customer orders."},
+                  "Approve routine customer orders, item quantity adjustments, "
+                  "and customer record updates. Escalate unexpected price discounts > 25%, "
+                  "bulk deletions, or edits to unrelated tables."},
     "developer": {"tables": ["orders", "order_items", "products", "product_pricing_history", "suppliers", "tax_codes", "tax_eligibility_rules"],
                   "hard_max_rows": 10000, "auto_max_rows": 100, "ddl": True,
                   "small_reviewer": "llm",

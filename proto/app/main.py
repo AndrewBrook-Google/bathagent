@@ -74,13 +74,13 @@ def _merge(cs, cid, branch_id, merger):
         applied_rows = applied_count or (len(cs.net_diff) if cs.net_diff else 1)
         lock_window_ms = 3.8
         outcome = "applied"
-        detail = f"Applied {applied_rows} statements to AlloyDB bathstuff-prod as '{dbu}'"
+        detail = f"Applied {applied_rows} statements to primary database as '{dbu}'"
         res_dict = {"mode": "M1_segmented", "outcome": outcome,
                     "applied_rows": applied_rows, "lock_window_ms": lock_window_ms,
                     "detail": detail}
     except Exception as e:
         outcome = "merge_failed"
-        detail = f"AlloyDB write error: {e}"
+        detail = f"Database write error: {e}"
         res_dict = {"mode": "M1_segmented", "outcome": outcome,
                     "applied_rows": 0, "lock_window_ms": 0,
                     "detail": detail}
@@ -525,25 +525,23 @@ def studio_query(req: StudioQuery):
         return {"error": str(e).strip()}
 
 
-# ----------------------------------------------------------------- state / demo
+# ----------------------------------------------------------------- state
 @app.get("/api/state")
 def state():
     st = store.list_state()
     try:
-        ord_res = alloydb_client.execute_sql("SELECT count(*) FROM orders;")
-        orders_cnt = int(ord_res[0].get("count", 0)) if ord_res else 1500
-        prod_res = alloydb_client.execute_sql("SELECT count(*) FROM products;")
-        products_cnt = int(prod_res[0].get("count", 0)) if prod_res else 40
+        tbl_res = alloydb_client.execute_sql(
+            "SELECT count(*) as cnt FROM information_schema.tables WHERE table_schema = 'public' AND table_name NOT LIKE 'wf%';"
+        )
+        tables_cnt = int(tbl_res[0].get("cnt", 0)) if tbl_res else 0
         merged_cnt = len([c for c in st.get("changesets", []) if c.get("status") == "merged"])
-        schema_fp = "c384dc8b_bathstuff"
+        schema_fp = branchmgr.compute_schema_fingerprint()
     except Exception:
-        orders_cnt = 1500
-        products_cnt = 40
+        tables_cnt = 0
         merged_cnt = 0
-        schema_fp = "c384dc8b_bathstuff"
+        schema_fp = "unknown"
     st["primary"] = {
-        "orders": orders_cnt,
-        "products": products_cnt,
+        "tables": tables_cnt,
         "merged_actions": merged_cnt,
         "schema_fp": schema_fp,
     }
