@@ -1,17 +1,20 @@
 """BathAgent enterprise AI assistant powered by Gemini 3.7 Flash & Wildfire.
 
 Connects to Google Cloud Vertex AI using Application Default Credentials (ADC).
-Operates strictly over AlloyDB PostgreSQL (bathstuff-prod) through isolated Wildfire sandbox
-branches, policy evaluations, and automatic writeback merges.
+Operates strictly over AlloyDB PostgreSQL (bathstuff-prod) through Wildfire
+transaction safety protocol (Path A: Propose-SQL over MCP).
 
 Features robust JSON parsing, automatic exponential backoff on 429 errors up to 5 attempts,
 and clean error emission with full traceback preservation in logs and JS console.
 """
+import asyncio
 import json
 import os
+import pathlib
 import random
 import re
 import subprocess
+import sys
 import time
 import traceback
 import urllib.request
@@ -19,7 +22,17 @@ from typing import Any, Dict, List, Tuple
 
 import httpx
 
-CONSOLE = "http://127.0.0.1:8777"
+# Ensure mcp from venv is accessible if running under standard python3
+_VENV_SITE = pathlib.Path(__file__).resolve().parents[4] / "wildfire-demo-0816" / ".venv" / "lib" / "python3.13" / "site-packages"
+if _VENV_SITE.exists() and str(_VENV_SITE) not in sys.path:
+    sys.path.insert(0, str(_VENV_SITE))
+
+import alloydb_client
+
+WF_CONSOLE = os.environ.get("WF_URL", "http://127.0.0.1:8787")
+WF_MCP_URL = os.environ.get("WF_MCP_URL", f"{WF_CONSOLE}/mcp")
+WF_MCP_TOKEN = os.environ.get("WF_MCP_TOKEN", "wildfire-bathstuff-token")
+
 PROJECT = os.environ.get("WF_PROJECT", "andybrook-playground")
 LOCATION = os.environ.get("WF_LOCATION", "global")
 MODEL = os.environ.get("WF_MODEL", "gemini-3.7-flash")
@@ -35,7 +48,7 @@ class ResourceExhaustedError(Exception):
 WATCH: List[Dict[str, Any]] = []
 
 SYSTEM_BATHAGENT = """You are BathAgent, BathStuff's enterprise AI assistant for customer service, order adjustments, catalog management, and billing inquiry.
-You operate on an AlloyDB PostgreSQL database (`bathstuff-prod`) via the Wildfire transaction safety protocol.
+You operate on an AlloyDB PostgreSQL database (`bathstuff-prod`) via the Wildfire transaction safety protocol (Path A: Propose-SQL).
 
 STRICT GROUNDING & ANTI-HALLUCINATION POLICY:
 1. You are strictly grounded in the database. You MUST ONLY respond with factual information retrieved directly from the database tools.
@@ -122,26 +135,26 @@ BUSINESS LOGIC & DOMAIN RULES:
    - Standard tax rate is determined by `tax_codes.default_rate` for the product's assigned `tax_code_id`.
    - If a product's supplier `country_of_origin` and `category` match an active `tax_eligibility_rules` entry as of the `order_date`, the `additional_tariff_rate` is added to the tax rate.
 
-WORKFLOW RULES:
+WORKFLOW RULES (Path A: Propose-SQL):
 - Read queries: Call `query` with standard SQL. Use `CURRENT_TIMESTAMP` for date/time comparisons.
 - Write modifications:
   1. Always `query` the target records first to verify exact current state.
-  2. Call `start_write_session` to detach into an isolated sandbox branch.
-  3. Execute `write` with your DML SQL (`UPDATE`, `INSERT`, `DELETE`).
-  4. Call `submit` to propose the changeset to the Wildfire policy engine.
-- Interpret `submit` outcomes truthfully:
-  - `auto-merged`: The change was approved and applied to `bathstuff-prod`. You may confirm completion.
-  - `pending_human`: The change requires human approval. Inform the user that it has been submitted for review.
-  - `rejected` or `merge_failed`: Explain the conflict or policy rejection.
+  2. Formulate the required DML statement(s) (`INSERT`, `UPDATE`, `DELETE`).
+  3. Call `propose_sql` with:
+     - `statements`: a list of SQL DML strings.
+     - `note`: a clear, specific description of what you are changing and the business reason. Reviewers evaluate the observed changes against this note.
+- Interpret `propose_sql` outcomes truthfully:
+  - `merged`: The change was approved and applied immediately to `bathstuff-prod`. Confirm completion to user.
+  - `pending_human`: The change requires human supervisor review in Wildfire. Inform the user that it has been submitted for review.
+  - `rejected` or `merge_failed`: Explain the conflict or policy rejection reason truthfully.
 - Final answer: Call `done` with a concise, customer-friendly, 100% grounded response.
 
 TOOL PROTOCOL:
 Output ONE JSON object per step (valid RFC 8259 JSON, all quotes escaped):
 {"thought": "reasoning grounded in facts...", "action": "query", "args": {"sql": "SELECT ..."}}
-{"thought": "reasoning...", "action": "start_write_session", "args": {}}
-{"thought": "reasoning...", "action": "write", "args": {"sql": "UPDATE/INSERT ..."}}
-{"thought": "reasoning...", "action": "submit", "args": {}}
-{"thought": "reasoning...", "action": "resync", "args": {}}
+{"thought": "reasoning...", "action": "propose_sql", "args": {"statements": ["UPDATE orders SET ...", "INSERT INTO order_items ..."], "note": "Adjust order 160 with 20% tariff and goodwill credit"}}
+{"thought": "reasoning...", "action": "get_changeset", "args": {"changeset_id": "cs_..."}}
+{"thought": "reasoning...", "action": "cancel_changeset", "args": {"changeset_id": "cs_...", "reason": "..."}}
 {"thought": "reasoning...", "action": "remember", "args": {"key": "...", "value": "..."}}
 {"thought": "reasoning...", "action": "done", "args": {"text": "Factual response based on query observations."}}
 """
@@ -165,9 +178,45 @@ def _get_token() -> str:
     return token
 
 
+async def _async_mcp_call(tool: str, args: Dict[str, Any], timeout: float = 60.0) -> Any:
+    from mcp import ClientSession
+    try:
+        from mcp.client.streamable_http import streamable_http_client as http_client
+    except ImportError:
+        from mcp.client.streamable_http import streamablehttp_client as http_client
+
+    headers = {"Authorization": f"Bearer {WF_MCP_TOKEN}"}
+    async with http_client(WF_MCP_URL, headers=headers) as (r, w, _):
+        async with ClientSession(r, w) as s:
+            await s.initialize()
+            res = await asyncio.wait_for(s.call_tool(tool, args), timeout=timeout)
+    body = res.structuredContent
+    if body is None:
+        if res.content:
+            first_item = res.content[0]
+            txt = getattr(first_item, "text", "")
+            if txt:
+                try:
+                    body = json.loads(txt)
+                except Exception:
+                    body = txt
+            else:
+                body = {}
+        else:
+            body = {}
+    return body.get("result", body) if isinstance(body, dict) else body
+
+
+def mcp_call(tool: str, args: Dict[str, Any], timeout: float = 60.0) -> Any:
+    try:
+        return asyncio.run(_async_mcp_call(tool, args, timeout=timeout))
+    except Exception as e:
+        return {"error": f"Wildfire MCP error ({tool}): {e}"}
+
+
 def _api(path: str, body: Any = None) -> Any:
     req = urllib.request.Request(
-        CONSOLE + path,
+        WF_CONSOLE + path,
         data=json.dumps(body).encode() if body is not None else None,
         headers={"Content-Type": "application/json"},
         method="POST" if body is not None else "GET",
@@ -298,44 +347,40 @@ class ChatSession:
         self.history: List[Tuple[str, str]] = []
         self.notes: Dict[str, Any] = {}
         self.trajectory: List[Dict[str, Any]] = []
-        self.reader_id: Any = None
-
-    def _ensure_reader(self, task: str):
-        if self.reader_id:
-            st = _api("/api/state")
-            live = {b["id"]: b["status"] for b in st.get("branches", [])}
-            if live.get(self.reader_id) in ("attached", "sandbox", "proposed"):
-                return
-        r = _api("/api/branches", {"actor": self.actor, "role": self.role})
-        self.reader_id = r["reader_id"]
 
     def tool(self, action: str, args: Dict[str, Any], task: str) -> Any:
-        self._ensure_reader(task)
-        rid = self.reader_id
-
         if action == "query":
-            r = _api(f"/api/branches/{rid}/exec", {"sql": args.get("sql", "")})
-            obs = r.get("rows", r)
-        elif action == "start_write_session":
-            obs = _api(f"/api/branches/{rid}/detach", {})
-        elif action == "write":
-            obs = _api(f"/api/branches/{rid}/exec", {"sql": args.get("sql", "")})
-        elif action == "submit":
-            obs = _api(
-                f"/api/branches/{rid}/propose",
-                {"task": task[:200], "trajectory": self.trajectory[-80:]},
-            )
-            if obs.get("status") == "pending_human" and obs.get("changeset_id"):
-                WATCH.append(
-                    {
-                        "cid": obs["changeset_id"],
-                        "note": task[:80],
-                        "actor": self.actor,
-                        "session": self,
-                    }
-                )
-        elif action == "resync":
-            obs = _api(f"/api/branches/{rid}/resync", {})
+            sql = args.get("sql", "").strip()
+            try:
+                rows = alloydb_client.execute_sql(sql)
+                obs = {"columns": list(rows[0].keys()) if rows else [], "rows": rows, "count": len(rows)}
+            except Exception as e:
+                obs = {"error": f"Query execution failed: {e}"}
+        elif action == "propose_sql":
+            stmts = args.get("statements", [])
+            if isinstance(stmts, str):
+                stmts = [stmts]
+            note = args.get("note", task[:200])
+            policy = args.get("policy", "")
+            obs = mcp_call("propose_sql", {"statements": stmts, "note": note, "policy": policy or None})
+            if isinstance(obs, dict) and obs.get("status") == "pending_human":
+                cid = obs.get("id") or obs.get("changeset_id")
+                if cid:
+                    WATCH.append(
+                        {
+                            "cid": cid,
+                            "note": note[:80],
+                            "actor": self.actor,
+                            "session": self,
+                        }
+                    )
+        elif action == "get_changeset":
+            cid = args.get("changeset_id", "")
+            obs = mcp_call("get_changeset", {"changeset_id": cid})
+        elif action == "cancel_changeset":
+            cid = args.get("changeset_id", "")
+            reason = args.get("reason", "")
+            obs = mcp_call("cancel_changeset", {"changeset_id": cid, "reason": reason})
         elif action == "remember":
             self.notes[args.get("key", "note")] = args.get("value", "")
             obs = {"ok": True, "notes": self.notes}
@@ -427,10 +472,10 @@ class ChatSession:
             }
 
             obs = self.tool(action, args, user_msg)
-            if action == "submit" and isinstance(obs, dict):
+            if action == "propose_sql" and isinstance(obs, dict):
                 if obs.get("status") == "pending_human":
-                    pending_cid = obs.get("changeset_id")
-                elif obs.get("status") == "auto-merged":
+                    pending_cid = obs.get("id") or obs.get("changeset_id")
+                elif obs.get("status") == "merged":
                     pending_cid = None
 
             rec = {

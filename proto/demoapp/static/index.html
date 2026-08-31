@@ -776,7 +776,7 @@
     <a href="http://localhost:8779/" target="_blank" class="nav-btn">
       <span>📊</span> Business Simulator ↗
     </a>
-    <a href="http://localhost:8777/" target="_blank" class="nav-btn">
+    <a href="http://localhost:8787/" target="_blank" class="nav-btn">
       <span>🛡</span> Wildfire Console ↗
     </a>
   </div>
@@ -870,9 +870,9 @@ function appendAgentMsg(text, steps) {
   let stepsHtml = '';
   if (steps && steps.length > 0) {
     const stepItems = steps.map((s, idx) => {
-      const isWrite = s.action === 'write' || s.action === 'start_write_session';
-      const isSubmit = s.action === 'submit';
-      const cls = isWrite ? 'step-item write-step' : isSubmit ? 'step-item submit-step' : 'step-item';
+      const isPropose = s.action === 'propose_sql' || s.action === 'submit';
+      const isGet = s.action === 'get_changeset' || s.action === 'cancel_changeset';
+      const cls = isPropose ? 'step-item submit-step' : isGet ? 'step-item write-step' : 'step-item';
       
       const thoughtHtml = s.thought ? `<div style="color:var(--text-secondary); margin-bottom:4px; font-style:italic;">💭 ${esc(s.thought)}</div>` : '';
       const obsHtml = s.observation !== undefined ? `<span class="obs">↳ ${esc(JSON.stringify(s.observation).slice(0, 320))}</span>` : '';
@@ -1005,9 +1005,9 @@ async function send() {
             stepCount = ev.step_idx || (stepCount + 1);
             countEl.textContent = stepCount;
 
-            const isWrite = ev.action === 'write' || ev.action === 'start_write_session';
-            const isSubmit = ev.action === 'submit';
-            const cls = isWrite ? 'step-item write-step' : isSubmit ? 'step-item submit-step' : 'step-item';
+            const isPropose = ev.action === 'propose_sql' || ev.action === 'submit';
+            const isGet = ev.action === 'get_changeset' || ev.action === 'cancel_changeset';
+            const cls = isPropose ? 'step-item submit-step' : isGet ? 'step-item write-step' : 'step-item';
 
             const thoughtHtml = ev.thought ? `<div style="color:var(--text-secondary); margin-bottom:4px; font-style:italic;">💭 ${esc(ev.thought)}</div>` : '';
             const stepDiv = document.createElement('div');
@@ -1023,12 +1023,12 @@ async function send() {
             if (statusTextEl) {
               if (ev.action === 'query') {
                 statusTextEl.textContent = `Step ${stepCount}: Querying AlloyDB bathstuff-prod…`;
-              } else if (ev.action === 'start_write_session') {
-                statusTextEl.textContent = `Step ${stepCount}: Detaching sandbox branch in Wildfire…`;
-              } else if (ev.action === 'write') {
-                statusTextEl.textContent = `Step ${stepCount}: Executing write modification in sandbox…`;
-              } else if (ev.action === 'submit') {
-                statusTextEl.textContent = `Step ${stepCount}: Submitting changeset to Wildfire policy engine…`;
+              } else if (ev.action === 'propose_sql') {
+                statusTextEl.textContent = `Step ${stepCount}: Proposing SQL statements to Wildfire review engine…`;
+              } else if (ev.action === 'get_changeset') {
+                statusTextEl.textContent = `Step ${stepCount}: Inspecting changeset status in Wildfire…`;
+              } else if (ev.action === 'cancel_changeset') {
+                statusTextEl.textContent = `Step ${stepCount}: Cancelling pending proposal in Wildfire…`;
               } else {
                 statusTextEl.textContent = `Step ${stepCount}: Executing ${ev.action}…`;
               }

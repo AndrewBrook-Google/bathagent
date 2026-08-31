@@ -1,8 +1,8 @@
 """BathAgent Enterprise Demo App (port 8778).
 
 Provides the interactive chat console for BathAgent.
-Directly invokes Vertex AI Gemini LLM (gemini-2.5-flash) and executes database tools
-through the Wildfire transaction safety platform (port 8777).
+Directly invokes Vertex AI Gemini LLM (gemini-3.7-flash) and executes database tools
+through the Wildfire transaction safety platform (Path A over MCP on port 8787).
 """
 import json
 import os
@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 import agent
 
-CONSOLE = "http://127.0.0.1:8777"
+CONSOLE = os.environ.get("WF_URL", "http://127.0.0.1:8787")
 app = FastAPI(title="BathAgent Enterprise Console")
 
 AGENTS = {
@@ -66,12 +66,6 @@ class NewChatReq(BaseModel):
 @app.post("/api/chat/new")
 def chat_new(req: NewChatReq = None):
     global SESSION
-    if SESSION and getattr(SESSION, "reader_id", None):
-        try:
-            # Cleanly resync / release branch in Wildfire
-            console(f"/api/branches/{SESSION.reader_id}/resync", {})
-        except Exception:
-            pass
     SESSION = agent.ChatSession(role="bathagent", actor="bathagent-chat")
     return {"ok": True, "agent": "bathagent", "message": "Session reset successfully"}
 
@@ -92,36 +86,22 @@ def follow_ups():
             keep.append(w)
             continue
         status = c.get("status")
-        if status == "approved":
-            m = console(
-                f"/api/changesets/{w['cid']}/merge",
-                {"merger": w.get("actor", "operator")},
-            )
-            status = m.get("status")
-            if status == "approved":
-                text = (
-                    f"Update: change {w['cid'][:8]} was approved by human reviewer, but primary database "
-                    f"refused merge ({m.get('merge', {}).get('detail', '')[:120]})."
-                )
-                msgs.append(text)
-                sess = w.get("session")
-                if sess is not None:
-                    sess.history.append(("agent", text))
-                    sess.trajectory.append({"t": "agent", "text": text})
-                continue
         if status == "merged":
             text = (
                 f"Good news — the reviewer approved change {w['cid'][:8]} and it has been merged. "
                 f"“{w['note']}” is confirmed! ✅"
             )
         elif status == "rejected":
+            reason = c.get("reason") or "policy"
             text = (
-                f"Update: change {w['cid'][:8]} (“{w['note']}”) was rejected by the human reviewer. "
+                f"Update: change {w['cid'][:8]} (“{w['note']}”) was rejected by the reviewer ({reason}). "
                 f"Nothing was applied to the database."
             )
         elif status == "merge_failed":
             detail = (c.get("merge_result") or {}).get("detail", "")
             text = f"Update: change {w['cid'][:8]} was approved but merge failed ({detail})."
+        elif status == "reverted":
+            text = f"Update: change {w['cid'][:8]} was reverted."
         else:
             keep.append(w)
             continue
